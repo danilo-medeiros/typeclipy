@@ -67,9 +67,9 @@ class TestBuffer:
 
     def test_position_with_line_wrap(self):
         buf = Buffer("Hello World, this example has a very long line", 20, 21)
+        assert buf.rendered_text == "Hello World, this\nexample has a very\nlong line"
         assert buf.pos_y == 1
         assert buf.pos_x == 3
-        assert buf.rendered_text == "Hello World, this\nexample has a very\nlong line"
         assert buf.highlighted == (18, 24)
 
     def test_render_with_line_wrap_on_space(self):

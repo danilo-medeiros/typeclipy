@@ -30,7 +30,7 @@ class Buffer:
             line_end = col_index + remaining_word_length
 
             if text_index == self.index:
-                if self.text[text_index] == " ":
+                if self.__space_or_line_break(self.text[text_index]):
                     self.highlighted = (-1, -1)
                 else:
                     self.highlighted = word_bounds
@@ -51,14 +51,14 @@ class Buffer:
         start_index = curr_index
 
         while start_index > 0:
-            if self.text[start_index - 1] == " " or self.text[start_index - 1] == "\n":
+            if self.__space_or_line_break(self.text[start_index - 1]):
                 break
             else:
                 start_index -= 1
 
         end_index = curr_index
         while end_index < len(self.text) - 1:
-            if self.text[end_index + 1] == " " or self.text[end_index + 1] == "\n":
+            if self.__space_or_line_break(self.text[end_index + 1]):
                 break
             else:
                 end_index += 1
@@ -80,3 +80,6 @@ class Buffer:
 
         self.index += 1
         self.render()
+
+    def __space_or_line_break(self, value):
+        return value == " " or value == "\n"

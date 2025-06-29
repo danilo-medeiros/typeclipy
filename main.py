@@ -110,7 +110,6 @@ class App:
         outer.refresh()
         win.refresh()
 
-        misses = 0
         start_time = 0
         first_key_stroke = True
 
@@ -127,7 +126,7 @@ class App:
         end_time = time.perf_counter()
         win.clear()
 
-        accuracy = (1.0 - misses / len(self.text)) * 100
+        accuracy = (1.0 - self.buffer.miss_count / len(self.text)) * 100
         duration_s = end_time - start_time
         duration_min = duration_s / 60
         wpm = len(self.text) / 5 / duration_min
