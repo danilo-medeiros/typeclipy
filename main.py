@@ -1,6 +1,7 @@
 import argparse
 import curses
 import time
+import re
 from curses import wrapper
 from buffer import Buffer
 
@@ -12,16 +13,14 @@ args = parser.parse_args()
 # TODO:
 # - Show 'retry' option
 # - Read multiple files
-# - Highlight delimiters (except space and line break)
 # - Status bar
 # - Read from stdin
 
 class App:
     def __init__(self, text):
         self.text = text
-        self.padding_y = 1
-        self.padding_x = 2
-        self.auto_line_breaks = []
+        self.debug = False
+        self.autoplay = False
 
     def setup(self, stdscr):
         curses.noecho()
@@ -48,10 +47,18 @@ class App:
             self.height = curses.LINES
             self.width = curses.COLS
 
-        self.buffer_x = self.x + 1
+        self.buffer_x = self.x + 2
         self.buffer_y = self.y + 1
-        self.buffer_width = self.width - 2
-        self.buffer_height = self.height - 2
+
+        # Subtract space for:
+        # - 2 columns for borders,
+        # - 1 column for line break (enter),
+        # - 1 column for left padding to align content.
+        self.buffer_width = self.width - 4
+
+        # We need to subtract 3 lines from the height to set the buffer height:
+        # 1 for the top border, 1 for the bottom border, and 1 for the status bar.
+        self.buffer_height = self.height - 3
 
     def text_wrap(self, max_width):
         char_index = 0
@@ -101,25 +108,44 @@ class App:
             if self.buffer.text[text_index] == "\n":
                 text = "⏎\n"
 
-            if miss:
-                win.addstr(text, curses.color_pair(2))
-            elif hit:
-                win.addstr(text, curses.color_pair(1))
-            elif underlined:
-                win.addstr(text, curses.A_UNDERLINE)
-            else:
-                win.addstr(text)
+            try:
+                if miss:
+                    win.addstr(text, curses.color_pair(2))
+                elif hit:
+                    win.addstr(text, curses.color_pair(1))
+                elif underlined:
+                    win.addstr(text, curses.A_UNDERLINE)
+                else:
+                    win.addstr(text)
+            except Exception as e:
+                error = f"Error trying to print character '{text}', index #{text_index}. Text around: '{self.buffer.rendered_text[text_index - 10:text_index + 10]}'"
+                buffer_info = f"self.buffer_width: {self.buffer_width}, self.buffer_height: {self.buffer_height}"
+                outer_info = f"self.width: {self.width}, self.height: {self.height}"
+                self.log(f"{error}\nbuffer:\t{buffer_info}\nouter:\t{outer_info}")
 
             text_index += 1
 
         win.move(self.buffer.pos_y, self.buffer.pos_x)
         win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
 
+    def log(self, message):
+        if self.debug:
+            self.debug_window.move(0, 0)
+            self.debug_window.deleteln()
+            self.debug_window.addstr(0, 0, message)
+            self.debug_window.refresh()
+
     def run(self, stdscr):
         self.setup(stdscr)
 
         outer = curses.newwin(self.height, self.width, self.y, self.x)
         outer.box()
+
+        if self.debug:
+            self.debug_window = curses.newwin(6, curses.COLS, curses.LINES - 5, 0)
+            self.debug_window.refresh()
+
+        self.log("Starting application")
 
         self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height)
 
@@ -133,7 +159,11 @@ class App:
         first_key_stroke = True
 
         while self.buffer.index < len(self.text):
-            c = win.get_wch()
+            c = self.buffer.text[self.buffer.index]
+            if self.autoplay:
+                time.sleep(0.02)
+            else:
+                c = win.get_wch()
 
             if first_key_stroke:
                 start_time = time.perf_counter()
@@ -152,7 +182,7 @@ class App:
         duration_min = duration_s / 60
         wpm = len(self.text) / 5 / duration_min
 
-        result_win = outer.derwin(self.buffer_height, self.buffer_width, 1, 1)
+        result_win = outer.derwin(self.buffer_height, self.buffer_width, 1, 2)
 
         result_win.addstr(0, 0, f"WPM: {wpm:.0f}")
 

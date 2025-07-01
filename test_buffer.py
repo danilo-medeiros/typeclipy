@@ -106,12 +106,6 @@ class TestBuffer:
         assert buf.curr_line() == 5
 
     def test_scroll_pos(self):
-
-#         Inputs:
-#         * Line count
-#         * Screen height
-#         * Current line
-#         * Padding
         text = "\n".join([f"a" for i in range(15)])
         buf = Buffer(text, 10, 10, 12)
 
