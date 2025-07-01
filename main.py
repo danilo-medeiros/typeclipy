@@ -2,6 +2,7 @@ import argparse
 import curses
 import time
 import re
+import threading
 from curses import wrapper
 from buffer import Buffer
 
@@ -13,21 +14,26 @@ args = parser.parse_args()
 # TODO:
 # - Show 'retry' option
 # - Read multiple files
-# - Status bar
+# - Test status bar responsivity
 # - Read from stdin
+# - Bug: Fix enter character positioning when focused
 
 class App:
     def __init__(self, text):
         self.text = text
         self.debug = False
         self.autoplay = False
+        self.waiting = True
+        self.done = False
 
     def setup(self, stdscr):
         curses.noecho()
         curses.cbreak()
         stdscr.keypad(True)
+        curses.curs_set(0)
         curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
         curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
+        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_WHITE)
         self.set_dimensions()
 
     def teardown(self, stdscr):
@@ -57,40 +63,8 @@ class App:
         self.buffer_width = self.width - 4
 
         # We need to subtract 3 lines from the height to set the buffer height:
-        # 1 for the top border, 1 for the bottom border, and 1 for the status bar.
-        self.buffer_height = self.height - 3
-
-    def text_wrap(self, max_width):
-        char_index = 0
-        col = 0
-
-        wrapped_text = ""
-
-        while char_index < len(self.text):
-            if self.text[char_index] == " ":
-                next_space = self.text[char_index:].find(" ")
-                next_break = self.text[char_index].find("\n")
-
-                word_end = 0
-
-                if next_space < next_break:
-                    word_end = next_space
-                else:
-                    word_end = next_break
-
-                word_length = word_end - char_index
-
-                if col + word_length >= max_width:
-                    wrapped_text += "\n"
-                    char_index += 1
-                    col = 0
-                    continue
-
-            wrapped_text += self.text[char_index]
-            char_index += 1
-            col += 1
-
-        return wrapped_text
+        # 1 for the top border, 1 for the bottom border, and 2 for the status bar.
+        self.buffer_height = self.height - 4
 
     def print_rendered_text(self, win):
         text_index = 0
@@ -126,6 +100,8 @@ class App:
             text_index += 1
 
         win.move(self.buffer.pos_y, self.buffer.pos_x)
+        if len(self.buffer.rendered_text) > self.buffer.index:
+            win.addstr(self.buffer.pos_y, self.buffer.pos_x, self.buffer.rendered_text[self.buffer.index], curses.color_pair(3))
         win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
 
     def log(self, message):
@@ -134,6 +110,34 @@ class App:
             self.debug_window.deleteln()
             self.debug_window.addstr(0, 0, message)
             self.debug_window.refresh()
+
+    def render_status_bar(self, status_bar):
+        status_bar.erase()
+
+        if self.done:
+            status_bar.refresh()
+            return
+
+        if self.waiting:
+            status_bar.addstr(0, 0, "  Ready  ")
+        else:
+            now = time.perf_counter()
+            accuracy = (1.0 - self.buffer.miss_count / len(self.text)) * 100
+            duration_s = now - self.start_time
+            duration_min = duration_s / 60
+            wpm = (self.buffer.index + 1) / 5 / duration_min
+            status_bar.addstr(0, 0, f"  WPM: {int(wpm)}")
+            status_bar.addstr(0, 17, f"Time: {int(duration_s)}s")
+            status_bar.addstr(0, 35, f"Accuracy: {accuracy:.2f}%")
+
+        status_bar.refresh()
+
+        def wrapper():
+            self.render_status_bar(status_bar)
+
+        t = threading.Timer(0.5, wrapper)
+        t.daemon = True
+        t.start()
 
     def run(self, stdscr):
         self.setup(stdscr)
@@ -151,34 +155,41 @@ class App:
 
         win = curses.newpad(self.buffer.line_count(), self.buffer_width)
 
+        status_bar = outer.derwin(1, self.buffer_width + 2, self.buffer_height + 2, 1)
+        status_bar.bkgd(" ", curses.color_pair(3))
+
         outer.refresh()
+
         self.print_rendered_text(win)
+        self.render_status_bar(status_bar)
         win.move(0, 0)
 
-        start_time = 0
-        first_key_stroke = True
+        self.start_time = 0
 
         while self.buffer.index < len(self.text):
             c = self.buffer.text[self.buffer.index]
             if self.autoplay:
-                time.sleep(0.02)
+                time.sleep(0.1)
             else:
                 c = win.get_wch()
 
-            if first_key_stroke:
-                start_time = time.perf_counter()
-                first_key_stroke = False
+            if self.waiting:
+                self.start_time = time.perf_counter()
+                self.waiting = False
 
             self.buffer.compute(c)
             self.print_rendered_text(win)
 
+
         end_time = time.perf_counter()
+
+        self.done = True
 
         win.clear()
         win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
 
         accuracy = (1.0 - self.buffer.miss_count / len(self.text)) * 100
-        duration_s = end_time - start_time
+        duration_s = end_time - self.start_time
         duration_min = duration_s / 60
         wpm = len(self.text) / 5 / duration_min
 
@@ -197,7 +208,6 @@ class App:
 
         result_win.refresh()
 
-        curses.curs_set(0)
         ex = result_win.getch()
 
         self.teardown(stdscr)
