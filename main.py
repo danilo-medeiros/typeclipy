@@ -9,10 +9,18 @@ parser.add_argument("--text", help="The text you want to type")
 parser.add_argument("--file", help="The path of the .txt file that contains the text that you want to type")
 args = parser.parse_args()
 
+# TODO:
+# - Show 'retry' option
+# - Pretty print time
+# - Bug: Read long text
+# - Read multiple files
+# - Highlight delimiters (except space and line break)
+# - Status bar
+
 class App:
     def __init__(self, text):
         self.text = text
-        self.padding_y = 2
+        self.padding_y = 1
         self.padding_x = 2
         self.auto_line_breaks = []
 
@@ -23,11 +31,28 @@ class App:
         stdscr.keypad(True)
         curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
         curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
+        self.set_dimensions()
 
     def teardown(self, stdscr):
         curses.nocbreak()
         stdscr.keypad(False)
         curses.echo()
+
+    def set_dimensions(self):
+#        self.x = round(curses.COLS * 0.15)
+#        self.y = round(curses.LINES * 0.25)
+#        self.height = round(curses.LINES * 0.5)
+#        self.width = round(curses.COLS * 0.70)
+
+        self.x = 0
+        self.y = 0
+        self.height = curses.LINES
+        self.width = curses.COLS
+
+        self.buffer_x = self.x + 1
+        self.buffer_y = self.y + 1
+        self.buffer_width = self.width - 2
+        self.buffer_height = self.height - 2
 
     def text_wrap(self, max_width):
         char_index = 0
@@ -89,26 +114,23 @@ class App:
             text_index += 1
 
         win.move(self.buffer.pos_y, self.buffer.pos_x)
-        win.refresh()
+        win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height, self.buffer_width)
 
     def run(self, stdscr):
         self.setup(stdscr)
 
-        begin_x = round(curses.COLS * 0.15); begin_y = round(curses.LINES * 0.25)
-        height = round(curses.LINES * 0.5); width = round(curses.COLS * 0.70)
-
-        outer = curses.newwin(height, width, begin_y, begin_x - 1)
+        outer = curses.newwin(self.height, self.width, self.y, self.x)
         outer.box()
 
-        win = outer.derwin(height - self.padding_y, width - self.padding_x * 2, 1, self.padding_x)
+        self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height)
 
-        self.buffer = Buffer(self.text, width - self.padding_x * 2)
+        win = curses.newpad(self.buffer.line_count(), self.buffer_width)
 
         self.print_rendered_text(win)
         win.move(0, 0)
 
         outer.refresh()
-        win.refresh()
+        win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height, self.buffer_width)
 
         start_time = 0
         first_key_stroke = True
@@ -134,7 +156,7 @@ class App:
         win.addstr(0, 0, f"WPM: {wpm:.0f}")
         win.addstr(1, 0, f"Time: {duration_s:.2f}s")
         win.addstr(2, 0, f"Accuracy: {accuracy:.2f}%")
-        win.addstr(height - 3, 0, "Press any key to exit...")
+        win.addstr(self.height - 3, 0, "Press any key to exit...")
         curses.curs_set(0)
         ex = win.getch()
 
