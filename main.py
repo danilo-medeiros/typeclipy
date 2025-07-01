@@ -13,9 +13,12 @@ args = parser.parse_args()
 
 # TODO:
 # - Show 'retry' option
+# - Show 'exit' option
 # - Read multiple files
+# - Show 'Next test' option if there are more test files
 # - Test status bar responsivity
 # - Read from stdin
+# - Color dictionary
 # - Bug: Fix enter character positioning when focused
 
 class App:
@@ -111,7 +114,7 @@ class App:
             self.debug_window.addstr(0, 0, message)
             self.debug_window.refresh()
 
-    def render_status_bar(self, status_bar):
+    def render_status_bar(self, status_bar, set_interval = False):
         status_bar.erase()
 
         if self.done:
@@ -126,7 +129,10 @@ class App:
             duration_s = now - self.start_time
             duration_min = duration_s / 60
             wpm = (self.buffer.index + 1) / 5 / duration_min
-            status_bar.addstr(0, 0, f"  WPM: {int(wpm)}")
+
+            if wpm < 1000:
+                status_bar.addstr(0, 0, f"  WPM: {int(wpm)}")
+
             status_bar.addstr(0, 17, f"Time: {int(duration_s)}s")
             status_bar.addstr(0, 35, f"Accuracy: {accuracy:.2f}%")
 
@@ -176,6 +182,7 @@ class App:
             if self.waiting:
                 self.start_time = time.perf_counter()
                 self.waiting = False
+                self.render_status_bar(status_bar, True)
 
             self.buffer.compute(c)
             self.print_rendered_text(win)
