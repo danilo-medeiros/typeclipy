@@ -12,7 +12,6 @@ args = parser.parse_args()
 # TODO:
 # - Show 'retry' option
 # - Pretty print time
-# - Bug: Read long text
 # - Read multiple files
 # - Highlight delimiters (except space and line break)
 # - Status bar
@@ -25,7 +24,6 @@ class App:
         self.auto_line_breaks = []
 
     def setup(self, stdscr):
-        stdscr = curses.initscr()
         curses.noecho()
         curses.cbreak()
         stdscr.keypad(True)
@@ -39,15 +37,16 @@ class App:
         curses.echo()
 
     def set_dimensions(self):
-#        self.x = round(curses.COLS * 0.15)
-#        self.y = round(curses.LINES * 0.25)
-#        self.height = round(curses.LINES * 0.5)
-#        self.width = round(curses.COLS * 0.70)
-
-        self.x = 0
-        self.y = 0
-        self.height = curses.LINES
-        self.width = curses.COLS
+        if curses.COLS > 100:
+            self.x = round(curses.COLS * 0.15)
+            self.y = round(curses.LINES * 0.25)
+            self.height = round(curses.LINES * 0.5)
+            self.width = round(curses.COLS * 0.70)
+        else:
+            self.x = 0
+            self.y = 0
+            self.height = curses.LINES
+            self.width = curses.COLS
 
         self.buffer_x = self.x + 1
         self.buffer_y = self.y + 1
@@ -114,7 +113,7 @@ class App:
             text_index += 1
 
         win.move(self.buffer.pos_y, self.buffer.pos_x)
-        win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height, self.buffer_width)
+        win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
 
     def run(self, stdscr):
         self.setup(stdscr)
@@ -126,11 +125,9 @@ class App:
 
         win = curses.newpad(self.buffer.line_count(), self.buffer_width)
 
+        outer.refresh()
         self.print_rendered_text(win)
         win.move(0, 0)
-
-        outer.refresh()
-        win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height, self.buffer_width)
 
         start_time = 0
         first_key_stroke = True
@@ -146,19 +143,26 @@ class App:
             self.print_rendered_text(win)
 
         end_time = time.perf_counter()
+
         win.clear()
+        win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
 
         accuracy = (1.0 - self.buffer.miss_count / len(self.text)) * 100
         duration_s = end_time - start_time
         duration_min = duration_s / 60
         wpm = len(self.text) / 5 / duration_min
 
-        win.addstr(0, 0, f"WPM: {wpm:.0f}")
-        win.addstr(1, 0, f"Time: {duration_s:.2f}s")
-        win.addstr(2, 0, f"Accuracy: {accuracy:.2f}%")
-        win.addstr(self.height - 3, 0, "Press any key to exit...")
+        result_win = outer.derwin(self.buffer_height, self.buffer_width, 1, 1)
+
+        result_win.addstr(0, 0, f"WPM: {wpm:.0f}")
+        result_win.addstr(1, 0, f"Time: {duration_s:.2f}s")
+        result_win.addstr(2, 0, f"Accuracy: {accuracy:.2f}%")
+        result_win.addstr(self.buffer_height - 1, 0, "Press any key to exit...")
+
+        result_win.refresh()
+
         curses.curs_set(0)
-        ex = win.getch()
+        ex = result_win.getch()
 
         self.teardown(stdscr)
 
