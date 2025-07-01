@@ -11,10 +11,10 @@ args = parser.parse_args()
 
 # TODO:
 # - Show 'retry' option
-# - Pretty print time
 # - Read multiple files
 # - Highlight delimiters (except space and line break)
 # - Status bar
+# - Read from stdin
 
 class App:
     def __init__(self, text):
@@ -155,7 +155,13 @@ class App:
         result_win = outer.derwin(self.buffer_height, self.buffer_width, 1, 1)
 
         result_win.addstr(0, 0, f"WPM: {wpm:.0f}")
-        result_win.addstr(1, 0, f"Time: {duration_s:.2f}s")
+
+        if duration_s > 60:
+            rest = (duration_min - int(duration_min)) * 60
+            result_win.addstr(1, 0, f"Time: {int(duration_min)}m {int(rest)}s")
+        else:
+            result_win.addstr(1, 0, f"Time: {duration_s:.2f}s")
+
         result_win.addstr(2, 0, f"Accuracy: {accuracy:.2f}%")
         result_win.addstr(self.buffer_height - 1, 0, "Press any key to exit...")
 
