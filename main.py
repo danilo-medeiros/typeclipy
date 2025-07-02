@@ -28,6 +28,7 @@ class App:
         self.autoplay = False
         self.waiting = True
         self.done = False
+        self.screen_lock = threading.Lock()
 
     def setup(self, stdscr):
         curses.noecho()
@@ -139,7 +140,8 @@ class App:
         status_bar.refresh()
 
         def wrapper():
-            self.render_status_bar(status_bar)
+            with self.screen_lock:
+                self.render_status_bar(status_bar)
 
         t = threading.Timer(0.5, wrapper)
         t.daemon = True
@@ -185,7 +187,9 @@ class App:
                 self.render_status_bar(status_bar, True)
 
             self.buffer.compute(c)
-            self.print_rendered_text(win)
+
+            with self.screen_lock:
+                self.print_rendered_text(win)
 
 
         end_time = time.perf_counter()
