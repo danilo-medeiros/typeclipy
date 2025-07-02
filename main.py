@@ -12,22 +12,22 @@ parser.add_argument("--file", help="The path of the .txt file that contains the 
 args = parser.parse_args()
 
 # TODO:
-# - Show 'retry' option
-# - Show 'exit' option
-# - Read multiple files
 # - Show 'Next test' option if there are more test files
+# - Read multiple files
 # - Test status bar responsivity
 # - Read from stdin
 # - Color dictionary
+# - Move stats variables to methods
 
 class App:
     def __init__(self, text):
         self.text = text
-        self.debug = False
+        self.debug = True
         self.autoplay = False
         self.waiting = True
         self.done = False
         self.screen_lock = threading.Lock()
+        self.result_menu_option = 0
 
     def setup(self, stdscr):
         curses.noecho()
@@ -127,7 +127,7 @@ class App:
             return
 
         if self.waiting:
-            status_bar.addstr(0, 0, "  Ready  ")
+            status_bar.addstr(0, 1, "Ready")
         else:
             now = time.perf_counter()
             accuracy = (1.0 - self.buffer.miss_count / len(self.text)) * 100
@@ -151,6 +151,32 @@ class App:
         t.daemon = True
         t.start()
 
+    def render_result_menu(self, result_win):
+        menu_options = ["Retry", "Exit"]
+
+        while True:
+            menu_index = 0
+
+            for idx, option in enumerate(menu_options):
+                prefix = "›  " if idx == self.result_menu_option else "   "
+                text = f"{prefix}{option}".ljust(10)
+                color = curses.color_pair(3) if idx == self.result_menu_option else 0
+                result_win.addstr(5 + idx, 0, text, color)
+
+            result_win.refresh()
+            key = result_win.getch()
+
+            self.log(f"User pressed key: {key}")
+
+            if key in (curses.KEY_DOWN, ord("j")) and self.result_menu_option < len(menu_options) - 1:
+                self.result_menu_option += 1
+
+            elif key in (curses.KEY_UP, ord("k")) and self.result_menu_option > 0:
+                self.result_menu_option -= 1
+
+            elif key in (curses.KEY_ENTER, 10, 13):
+                return
+
     def run(self, stdscr):
         self.setup(stdscr)
 
@@ -172,58 +198,70 @@ class App:
 
         outer.refresh()
 
-        self.print_rendered_text(win)
-        self.render_status_bar(status_bar)
-        win.move(0, 0)
+        while True:
+            self.print_rendered_text(win)
+            self.render_status_bar(status_bar)
+            win.move(0, 0)
 
-        self.start_time = 0
+            self.start_time = 0
 
-        while self.buffer.index < len(self.text):
-            c = self.buffer.text[self.buffer.index]
-            if self.autoplay:
-                time.sleep(0.1)
+            while self.buffer.index < len(self.text):
+                c = self.buffer.text[self.buffer.index]
+                if self.autoplay:
+                    time.sleep(0.1)
+                else:
+                    c = win.get_wch()
+
+                if self.waiting:
+                    self.start_time = time.perf_counter()
+                    self.waiting = False
+                    self.render_status_bar(status_bar, True)
+
+                self.buffer.compute(c)
+
+                with self.screen_lock:
+                    self.print_rendered_text(win)
+
+
+            end_time = time.perf_counter()
+
+            self.done = True
+
+            win.clear()
+            win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
+
+            accuracy = (1.0 - self.buffer.miss_count / len(self.text)) * 100
+            duration_s = end_time - self.start_time
+            duration_min = duration_s / 60
+            wpm = len(self.text) / 5 / duration_min
+
+            result_win = outer.derwin(self.buffer_height, self.buffer_width, 1, 2)
+            result_win.keypad(True)
+            result_win.addstr(0, 0, f"WPM: {wpm:.0f}")
+
+            if duration_s > 60:
+                rest = (duration_min - int(duration_min)) * 60
+                result_win.addstr(1, 0, f"Time: {int(duration_min)}m {int(rest)}s")
             else:
-                c = win.get_wch()
+                result_win.addstr(1, 0, f"Time: {duration_s:.2f}s")
 
-            if self.waiting:
-                self.start_time = time.perf_counter()
-                self.waiting = False
-                self.render_status_bar(status_bar, True)
+            result_win.addstr(2, 0, f"Accuracy: {accuracy:.2f}%")
 
-            self.buffer.compute(c)
+            self.render_result_menu(result_win)
 
-            with self.screen_lock:
-                self.print_rendered_text(win)
+            if self.result_menu_option == 0:
+                self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height)
+                self.waiting = True
+                self.done = False
 
+                del result_win
+                outer.clear()
+                outer.box()
+                outer.refresh()
 
-        end_time = time.perf_counter()
-
-        self.done = True
-
-        win.clear()
-        win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
-
-        accuracy = (1.0 - self.buffer.miss_count / len(self.text)) * 100
-        duration_s = end_time - self.start_time
-        duration_min = duration_s / 60
-        wpm = len(self.text) / 5 / duration_min
-
-        result_win = outer.derwin(self.buffer_height, self.buffer_width, 1, 2)
-
-        result_win.addstr(0, 0, f"WPM: {wpm:.0f}")
-
-        if duration_s > 60:
-            rest = (duration_min - int(duration_min)) * 60
-            result_win.addstr(1, 0, f"Time: {int(duration_min)}m {int(rest)}s")
-        else:
-            result_win.addstr(1, 0, f"Time: {duration_s:.2f}s")
-
-        result_win.addstr(2, 0, f"Accuracy: {accuracy:.2f}%")
-        result_win.addstr(self.buffer_height - 1, 0, "Press any key to exit...")
-
-        result_win.refresh()
-
-        ex = result_win.getch()
+                continue
+            if self.result_menu_option == 1:
+                break
 
         self.teardown(stdscr)
 
