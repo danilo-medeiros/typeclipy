@@ -19,7 +19,6 @@ args = parser.parse_args()
 # - Test status bar responsivity
 # - Read from stdin
 # - Color dictionary
-# - Bug: Fix enter character positioning when focused
 
 class App:
     def __init__(self, text):
@@ -84,7 +83,7 @@ class App:
             text = self.buffer.rendered_text[text_index]
 
             if self.buffer.text[text_index] == "\n":
-                text = "⏎\n"
+                text = "↵\n"
 
             try:
                 if miss:
@@ -104,8 +103,13 @@ class App:
             text_index += 1
 
         win.move(self.buffer.pos_y, self.buffer.pos_x)
+
         if len(self.buffer.rendered_text) > self.buffer.index:
-            win.addstr(self.buffer.pos_y, self.buffer.pos_x, self.buffer.rendered_text[self.buffer.index], curses.color_pair(3))
+            if self.buffer.text[self.buffer.index] == "\n":
+                win.addstr(self.buffer.pos_y, self.buffer.pos_x, "↵\n", curses.color_pair(3))
+            else:
+                win.addstr(self.buffer.pos_y, self.buffer.pos_x, self.buffer.rendered_text[self.buffer.index], curses.color_pair(3))
+
         win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
 
     def log(self, message):
