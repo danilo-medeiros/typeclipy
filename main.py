@@ -18,7 +18,6 @@ args = parser.parse_args()
 # - Move stats variables to methods
 # - Add menu handlers instead of conditions
 # - Change menu order (Retry, Next, Exit) or (Retry, Exit)
-# - Bug: Check line break when there's a period (brazil.txt)
 # - Adjust window height according to the line count
 
 class App:

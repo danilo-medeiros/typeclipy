@@ -105,4 +105,4 @@ class Buffer:
         self.render()
 
     def __is_delimiter(self, value):
-        return re.match(r"[\s\n,;.]$", value) is not None
+        return re.match(r"[\s\n,;]$", value) is not None
