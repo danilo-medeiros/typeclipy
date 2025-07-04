@@ -3,24 +3,26 @@ import curses
 import time
 import re
 import threading
+import sys
+import os
+
 from curses import wrapper
 from buffer import Buffer
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--text", help="The text you want to type")
-parser.add_argument("--file", help="The path of the .txt file that contains the text that you want to type")
+parser.add_argument("--text", nargs="+", help="The text you want to type")
+parser.add_argument("--file", nargs="+", help="The path(s) of the .txt file(s) that contains the text that you want to type")
 args = parser.parse_args()
 
 # TODO:
-# - Show 'Next test' option if there are more test files
-# - Read multiple files
-# - Test status bar responsivity
-# - Read from stdin
-# - Color dictionary
 # - Move stats variables to methods
+# - Add menu handlers instead of conditions
+# - Change menu order (Retry, Next, Exit) or (Retry, Exit)
+# - Bug: Check line break when there's a period (brazil.txt)
+# - Adjust window height according to the line count
 
 class App:
-    def __init__(self, text):
+    def __init__(self, text, has_next):
         self.text = text
         self.debug = True
         self.autoplay = False
@@ -28,24 +30,21 @@ class App:
         self.done = False
         self.screen_lock = threading.Lock()
         self.result_menu_option = 0
+        self.has_next = has_next
 
     def setup(self, stdscr):
         curses.noecho()
         curses.cbreak()
         stdscr.keypad(True)
         curses.curs_set(0)
-        curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
-        curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
-        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_WHITE)
-        self.set_dimensions()
+        self.define_colors()
 
-    def teardown(self, stdscr):
-        curses.nocbreak()
-        stdscr.keypad(False)
-        curses.echo()
-
-    def set_dimensions(self):
-        if curses.COLS > 100:
+        if curses.COLS > 200:
+            self.x = round(curses.COLS * 0.25)
+            self.y = round(curses.LINES * 0.25)
+            self.height = round(curses.LINES * 0.5)
+            self.width = round(curses.COLS * 0.5)
+        elif curses.COLS > 100:
             self.x = round(curses.COLS * 0.15)
             self.y = round(curses.LINES * 0.25)
             self.height = round(curses.LINES * 0.5)
@@ -69,6 +68,22 @@ class App:
         # 1 for the top border, 1 for the bottom border, and 2 for the status bar.
         self.buffer_height = self.height - 4
 
+    def define_colors(self):
+        curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
+        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_WHITE)
+
+        self.colors = {
+            "success": curses.color_pair(1),
+            "error": curses.color_pair(2),
+            "reverse": curses.color_pair(3),
+        }
+
+    def teardown(self, stdscr):
+        curses.nocbreak()
+        stdscr.keypad(False)
+        curses.echo()
+
     def print_rendered_text(self, win):
         text_index = 0
 
@@ -87,9 +102,9 @@ class App:
 
             try:
                 if miss:
-                    win.addstr(text, curses.color_pair(2))
+                    win.addstr(text, self.colors["error"])
                 elif hit:
-                    win.addstr(text, curses.color_pair(1))
+                    win.addstr(text, self.colors["success"])
                 elif underlined:
                     win.addstr(text, curses.A_UNDERLINE)
                 else:
@@ -106,9 +121,9 @@ class App:
 
         if len(self.buffer.rendered_text) > self.buffer.index:
             if self.buffer.text[self.buffer.index] == "\n":
-                win.addstr(self.buffer.pos_y, self.buffer.pos_x, "↵\n", curses.color_pair(3))
+                win.addstr(self.buffer.pos_y, self.buffer.pos_x, "↵\n", self.colors["reverse"])
             else:
-                win.addstr(self.buffer.pos_y, self.buffer.pos_x, self.buffer.rendered_text[self.buffer.index], curses.color_pair(3))
+                win.addstr(self.buffer.pos_y, self.buffer.pos_x, self.buffer.rendered_text[self.buffer.index], self.colors["reverse"])
 
         win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
 
@@ -153,6 +168,9 @@ class App:
 
     def render_result_menu(self, result_win):
         menu_options = ["Retry", "Exit"]
+        
+        if self.has_next:
+            menu_options.append("Next")
 
         while True:
             menu_index = 0
@@ -160,7 +178,7 @@ class App:
             for idx, option in enumerate(menu_options):
                 prefix = "›  " if idx == self.result_menu_option else "   "
                 text = f"{prefix}{option}".ljust(10)
-                color = curses.color_pair(3) if idx == self.result_menu_option else 0
+                color = self.colors["reverse"] if idx == self.result_menu_option else 0
                 result_win.addstr(5 + idx, 0, text, color)
 
             result_win.refresh()
@@ -183,18 +201,20 @@ class App:
         outer = curses.newwin(self.height, self.width, self.y, self.x)
         outer.box()
 
+        stop = False
+
         if self.debug:
             self.debug_window = curses.newwin(6, curses.COLS, curses.LINES - 5, 0)
             self.debug_window.refresh()
 
-        self.log("Starting application")
+        self.log(f"Starting application, has_next={self.has_next}")
 
         self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height)
 
         win = curses.newpad(self.buffer.line_count(), self.buffer_width)
 
         status_bar = outer.derwin(1, self.buffer_width + 2, self.buffer_height + 2, 1)
-        status_bar.bkgd(" ", curses.color_pair(3))
+        status_bar.bkgd(" ", self.colors["reverse"])
 
         outer.refresh()
 
@@ -261,20 +281,35 @@ class App:
 
                 continue
             if self.result_menu_option == 1:
+                stop = True
+                break
+
+            if self.result_menu_option == 2:
                 break
 
         self.teardown(stdscr)
+        return stop
 
-text = args.text
+text_list = args.text or []
 
-if args.file != None:
-    file = open(args.file)
-    text = file.read().strip()
+if not sys.stdin.isatty():
+    data = sys.stdin.read()
+    text_list = [data.strip()]
+    tty = open("/dev/tty")
+    os.dup2(tty.fileno(), sys.stdin.fileno())
+elif args.file:
+    text_list = []
 
-app = App(text)
+    for file_path in args.file:
+        with open(file_path, "r", encoding="utf-8") as f:
+            text_list.append(f.read().strip())
 
 try:
-    wrapper(app.run)
+    for idx, text in enumerate(text_list):
+        app = App(text, has_next=(idx < len(text_list) - 1))
+        stop = wrapper(app.run)
+        if stop:
+            break
 except KeyboardInterrupt:
     pass
 
