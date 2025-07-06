@@ -8,7 +8,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--text", nargs="+", help="The text you want to type")
     parser.add_argument("--file", nargs="+", help="The path(s) of the .txt file(s) that contains the text that you want to type")
-    parser.add_argument("--minimal", help="Don't show results", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--minimal", help="Don't show results", action="store_true")
     args = parser.parse_args()
 
     text_list = args.text or []
