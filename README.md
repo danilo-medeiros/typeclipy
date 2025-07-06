@@ -1,6 +1,8 @@
 # typeclipy
 ## A lightweight command-line tool to help you practice typing with custom exercises
 
+![Screenshot](assets/screenshot.jpg)
+
 ## Features
 - Practice typing the text you want
 - Tracks typing speed and accuracy
