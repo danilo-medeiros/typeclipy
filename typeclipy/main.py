@@ -137,7 +137,9 @@ class App:
             self.debug_window.refresh()
 
     def accuracy(self):
-        return f"{((1.0 - self.buffer.miss_count / self.buffer.index) * 100):.2f}%"
+        if self.buffer.index > 0:
+            return f"{((1.0 - self.buffer.miss_count / self.buffer.index) * 100):.2f}%"
+        return ""
 
     def wpm(self, now):
         duration_s = now - self.start_time
