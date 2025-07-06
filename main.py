@@ -12,16 +12,15 @@ from buffer import Buffer
 parser = argparse.ArgumentParser()
 parser.add_argument("--text", nargs="+", help="The text you want to type")
 parser.add_argument("--file", nargs="+", help="The path(s) of the .txt file(s) that contains the text that you want to type")
+parser.add_argument("--minimal", help="Don't show results", action=argparse.BooleanOptionalAction)
 args = parser.parse_args()
 
 # TODO:
-# - Move stats variables to methods
 # - Add menu handlers instead of conditions
-# - Change menu order (Retry, Next, Exit) or (Retry, Exit)
-# - Adjust window height according to the line count
+# - Change menu order (Next, Retry, Exit) or (Retry, Exit)
 
 class App:
-    def __init__(self, text, has_next):
+    def __init__(self, text, has_next, minimal):
         self.text = text
         self.debug = True
         self.autoplay = False
@@ -30,6 +29,7 @@ class App:
         self.screen_lock = threading.Lock()
         self.result_menu_option = 0
         self.has_next = has_next
+        self.minimal = minimal
 
     def setup(self, stdscr):
         curses.noecho()
@@ -133,6 +133,14 @@ class App:
             self.debug_window.addstr(0, 0, message)
             self.debug_window.refresh()
 
+    def accuracy(self):
+        return f"{((1.0 - self.buffer.miss_count / self.buffer.index) * 100):.2f}%"
+
+    def wpm(self, now):
+        duration_s = now - self.start_time
+        duration_min = duration_s / 60
+        return int((self.buffer.index + 1) / 5 / duration_min)
+
     def render_status_bar(self, status_bar, set_interval = False):
         status_bar.erase()
 
@@ -144,16 +152,13 @@ class App:
             status_bar.addstr(0, 1, "Ready")
         else:
             now = time.perf_counter()
-            accuracy = (1.0 - self.buffer.miss_count / len(self.text)) * 100
-            duration_s = now - self.start_time
-            duration_min = duration_s / 60
-            wpm = (self.buffer.index + 1) / 5 / duration_min
+            wpm = self.wpm(now)
 
-            if wpm < 1000:
-                status_bar.addstr(0, 0, f"  WPM: {int(wpm)}")
+            if wpm < 300:
+                status_bar.addstr(0, 0, f"  WPM: {wpm}")
 
-            status_bar.addstr(0, 17, f"Time: {int(duration_s)}s")
-            status_bar.addstr(0, 35, f"Accuracy: {accuracy:.2f}%")
+            status_bar.addstr(0, 17, f"Time: {int(now - self.start_time)}s")
+            status_bar.addstr(0, 35, f"Accuracy: {self.accuracy()}")
 
         status_bar.refresh()
 
@@ -164,6 +169,23 @@ class App:
         t = threading.Timer(0.5, wrapper)
         t.daemon = True
         t.start()
+
+    def render_result(self, result_win):
+        end_time = time.perf_counter()
+
+        duration_s = end_time - self.start_time
+        duration_min = duration_s / 60
+
+        wpm = self.wpm(end_time)
+        result_win.addstr(0, 0, f"WPM: {wpm:.0f}")
+
+        if duration_s > 60:
+            rest = (duration_min - int(duration_min)) * 60
+            result_win.addstr(1, 0, f"Time: {int(duration_min)}m {int(rest)}s")
+        else:
+            result_win.addstr(1, 0, f"Time: {duration_s:.2f}s")
+
+        result_win.addstr(2, 0, f"Accuracy: {self.accuracy()}")
 
     def render_result_menu(self, result_win):
         menu_options = ["Retry", "Exit"]
@@ -197,6 +219,15 @@ class App:
     def run(self, stdscr):
         self.setup(stdscr)
 
+        self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height)
+
+        # Resize default dimensions if buffer height is smaller than expected
+        diff = self.buffer_height - self.buffer.height
+        self.height = self.height - diff
+        self.buffer_height = self.buffer_height - diff
+        self.y = self.y + diff // 2
+        self.buffer_y = self.buffer_y + diff // 2
+
         outer = curses.newwin(self.height, self.width, self.y, self.x)
         outer.box()
 
@@ -207,8 +238,6 @@ class App:
             self.debug_window.refresh()
 
         self.log(f"Starting application, has_next={self.has_next}")
-
-        self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height)
 
         win = curses.newpad(self.buffer.line_count(), self.buffer_width)
 
@@ -231,41 +260,28 @@ class App:
                 else:
                     c = win.get_wch()
 
+                self.buffer.compute(c)
+
                 if self.waiting:
                     self.start_time = time.perf_counter()
                     self.waiting = False
                     self.render_status_bar(status_bar, True)
 
-                self.buffer.compute(c)
-
                 with self.screen_lock:
                     self.print_rendered_text(win)
 
-
-            end_time = time.perf_counter()
 
             self.done = True
 
             win.clear()
             win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
 
-            accuracy = (1.0 - self.buffer.miss_count / len(self.text)) * 100
-            duration_s = end_time - self.start_time
-            duration_min = duration_s / 60
-            wpm = len(self.text) / 5 / duration_min
+            if self.minimal:
+                break
 
             result_win = outer.derwin(self.buffer_height, self.buffer_width, 1, 2)
             result_win.keypad(True)
-            result_win.addstr(0, 0, f"WPM: {wpm:.0f}")
-
-            if duration_s > 60:
-                rest = (duration_min - int(duration_min)) * 60
-                result_win.addstr(1, 0, f"Time: {int(duration_min)}m {int(rest)}s")
-            else:
-                result_win.addstr(1, 0, f"Time: {duration_s:.2f}s")
-
-            result_win.addstr(2, 0, f"Accuracy: {accuracy:.2f}%")
-
+            self.render_result(result_win)
             self.render_result_menu(result_win)
 
             if self.result_menu_option == 0:
@@ -305,7 +321,7 @@ elif args.file:
 
 try:
     for idx, text in enumerate(text_list):
-        app = App(text, has_next=(idx < len(text_list) - 1))
+        app = App(text, has_next=(idx < len(text_list) - 1), minimal=args.minimal)
         stop = wrapper(app.run)
         if stop:
             break

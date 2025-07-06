@@ -14,6 +14,12 @@ class Buffer:
         self.highlighted = (0, 0)
         self.render()
 
+        # Resize buffer if content is smaller than height:
+        lc = self.line_count()
+        if self.height > lc:
+            self.height = max(lc, 8)
+
+
     def render(self):
         rendered_text = ""
 
@@ -105,4 +111,4 @@ class Buffer:
         self.render()
 
     def __is_delimiter(self, value):
-        return re.match(r"[\s\n,;]$", value) is not None
+        return re.match(r"[\s\n]$", value) is not None
