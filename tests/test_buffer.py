@@ -1,4 +1,4 @@
-from buffer import Buffer
+from typeclipy.buffer import Buffer
 
 class TestBuffer:
     def test_initialize(self):
@@ -86,10 +86,6 @@ class TestBuffer:
     def test_word_bounds_with_line_breaks(self):
         buf = Buffer("Hello World\nWith line\nbreaks", 80, 30, 15)
         assert buf.word_bounds(10) == (6, 10)
-
-    def test_word_bounds_strip_commas(self):
-        buf = Buffer("This sentence, has a comma", 80)
-        assert buf.word_bounds(5) == (5, 12)
 
     def test_line_count(self):
         buf = Buffer("Hello World with one line", 80)

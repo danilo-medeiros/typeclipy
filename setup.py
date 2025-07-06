@@ -1,0 +1,15 @@
+from setuptools import setup, find_packages
+
+setup(
+    name='typeclipy',
+    version='0.1',
+    packages=find_packages(),
+    install_requires=[
+        "pytest>=8.4.1",
+    ],
+    entry_points={
+        "console_scripts": [
+            "typeclipy = typeclipy.main:main",
+        ],
+    },
+)
