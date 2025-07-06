@@ -16,13 +16,12 @@ parser.add_argument("--minimal", help="Don't show results", action=argparse.Bool
 args = parser.parse_args()
 
 # TODO:
-# - Add menu handlers instead of conditions
-# - Change menu order (Next, Retry, Exit) or (Retry, Exit)
+# - Improve app responsivity during runtime
 
 class App:
     def __init__(self, text, has_next, minimal):
         self.text = text
-        self.debug = True
+        self.debug = False
         self.autoplay = False
         self.waiting = True
         self.done = False
@@ -30,6 +29,10 @@ class App:
         self.result_menu_option = 0
         self.has_next = has_next
         self.minimal = minimal
+
+        self.menu_options = ["Retry", "Exit"]
+        if self.has_next:
+            self.menu_options.insert(0, "Next")
 
     def setup(self, stdscr):
         curses.noecho()
@@ -188,15 +191,10 @@ class App:
         result_win.addstr(2, 0, f"Accuracy: {self.accuracy()}")
 
     def render_result_menu(self, result_win):
-        menu_options = ["Retry", "Exit"]
-        
-        if self.has_next:
-            menu_options.append("Next")
-
         while True:
             menu_index = 0
 
-            for idx, option in enumerate(menu_options):
+            for idx, option in enumerate(self.menu_options):
                 prefix = "›  " if idx == self.result_menu_option else "   "
                 text = f"{prefix}{option}".ljust(10)
                 color = self.colors["reverse"] if idx == self.result_menu_option else 0
@@ -207,7 +205,7 @@ class App:
 
             self.log(f"User pressed key: {key}")
 
-            if key in (curses.KEY_DOWN, ord("j")) and self.result_menu_option < len(menu_options) - 1:
+            if key in (curses.KEY_DOWN, ord("j")) and self.result_menu_option < len(self.menu_options) - 1:
                 self.result_menu_option += 1
 
             elif key in (curses.KEY_UP, ord("k")) and self.result_menu_option > 0:
@@ -284,7 +282,9 @@ class App:
             self.render_result(result_win)
             self.render_result_menu(result_win)
 
-            if self.result_menu_option == 0:
+            selected_menu_option = self.menu_options[self.result_menu_option]
+
+            if selected_menu_option == "Retry":
                 self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height)
                 self.waiting = True
                 self.done = False
@@ -295,11 +295,11 @@ class App:
                 outer.refresh()
 
                 continue
-            if self.result_menu_option == 1:
+            if selected_menu_option == "Exit":
                 stop = True
                 break
 
-            if self.result_menu_option == 2:
+            if selected_menu_option == "Next":
                 break
 
         self.teardown(stdscr)
