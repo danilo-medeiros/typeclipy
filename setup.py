@@ -5,7 +5,7 @@ setup(
     version='0.1',
     packages=find_packages(),
     install_requires=[
-        "pytest>=8.4.1",
+        "pytest",
     ],
     entry_points={
         "console_scripts": [
