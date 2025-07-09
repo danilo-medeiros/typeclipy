@@ -10,7 +10,7 @@ from typeclipy.buffer import Buffer
 # - Improve app responsivity during runtime
 
 class App:
-    def __init__(self, text, has_next, minimal):
+    def __init__(self, text, has_next, minimal, theme = None):
         self.text = text
         self.debug = False
         self.autoplay = False
@@ -20,6 +20,7 @@ class App:
         self.result_menu_option = 0
         self.has_next = has_next
         self.minimal = minimal
+        self.theme = theme
 
         self.menu_options = ["Retry", "Exit"]
         if self.has_next:
@@ -31,6 +32,9 @@ class App:
         stdscr.keypad(True)
         curses.curs_set(0)
         self.define_colors()
+        stdscr.bkgd(" ", self.colors["background"])
+        stdscr.clear()
+        stdscr.refresh()
 
         if curses.COLS > 200:
             self.x = round(curses.COLS * 0.25)
@@ -62,14 +66,39 @@ class App:
         self.buffer_height = self.height - 4
 
     def define_colors(self):
-        curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
-        curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
-        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_WHITE)
+        curses.start_color()
+
+        background = 235
+        success = 70
+        primary = 250
+        danger = 160
+
+        if self.theme == "warm_sunset":
+            background = 52
+            success = 142
+            primary = 223
+            danger = 203
+        elif self.theme == "ocean_breeze":
+            background = 17
+            success = 79
+            primary = 188
+            danger = 124
+        elif self.theme == "solarized_dark":
+            background = 235
+            success = 108
+            primary = 136
+            danger = 167
+
+        curses.init_pair(1, success, background)
+        curses.init_pair(2, primary, danger)
+        curses.init_pair(3, background, primary)
+        curses.init_pair(4, primary, background)
 
         self.colors = {
             "success": curses.color_pair(1),
             "error": curses.color_pair(2),
             "reverse": curses.color_pair(3),
+            "background": curses.color_pair(4)
         }
 
     def teardown(self, stdscr):
@@ -86,7 +115,8 @@ class App:
             miss = text_index in self.buffer.misses
             hit = text_index < self.buffer.index and not miss
             typed = miss or hit
-            underlined = not typed and text_index >= self.buffer.highlighted[0] and text_index <= self.buffer.highlighted[1]
+            period_or_comma = re.match(r"[,.]$", self.buffer.text[text_index]) is not None
+            underlined = not typed and text_index >= self.buffer.highlighted[0] and text_index <= self.buffer.highlighted[1] and not period_or_comma
 
             text = self.buffer.rendered_text[text_index]
 
@@ -220,6 +250,8 @@ class App:
         self.buffer_y = self.buffer_y + diff // 2
 
         outer = curses.newwin(self.height, self.width, self.y, self.x)
+        outer.bkgd(" ", self.colors["background"])
+        outer.clear()
         outer.box()
 
         stop = False
@@ -231,6 +263,8 @@ class App:
         self.log(f"Starting application, has_next={self.has_next}")
 
         win = curses.newpad(self.buffer.line_count(), self.buffer_width)
+        win.bkgd(" ", self.colors["background"])
+        win.clear()
 
         status_bar = outer.derwin(1, self.buffer_width + 2, self.buffer_height + 2, 1)
         status_bar.bkgd(" ", self.colors["reverse"])

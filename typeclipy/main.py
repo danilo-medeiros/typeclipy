@@ -9,6 +9,8 @@ def main():
     parser.add_argument("--text", nargs="+", help="The text you want to type")
     parser.add_argument("--file", nargs="+", help="The path(s) of the .txt file(s) that contains the text that you want to type")
     parser.add_argument("--minimal", help="Don't show results", action="store_true")
+    parser.add_argument("--theme", help="Application theme. Options: warm_sunset, ocean_breeze, solarized_dark")
+
     args = parser.parse_args()
 
     text_list = args.text or []
@@ -27,7 +29,7 @@ def main():
 
     try:
         for idx, text in enumerate(text_list):
-            app = App(text, has_next=(idx < len(text_list) - 1), minimal=args.minimal)
+            app = App(text, has_next=(idx < len(text_list) - 1), minimal=args.minimal, theme=args.theme)
             stop = app.start()
 
             if stop:
