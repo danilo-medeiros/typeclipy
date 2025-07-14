@@ -124,3 +124,23 @@ class TestBuffer:
         assert buf.curr_line() == 11
         assert buf.scroll_pos() == 5
 
+    def test_delete_word(self):
+        text = "Hello World there"
+        buf = Buffer(text, 80)
+        buf.compute("H")
+        buf.compute("e")
+        buf.compute("l")
+        buf.compute("l")
+        buf.compute("o")
+        buf.compute(" ")
+        buf.compute("X")
+        assert buf.misses == [6]
+
+        buf.delete_word()
+        assert buf.miss_count == 1
+        assert buf.pos_x == 6
+        assert buf.misses == []
+
+        buf.delete_word()
+        assert buf.pos_x == 0
+

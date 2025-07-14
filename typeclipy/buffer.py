@@ -103,11 +103,37 @@ class Buffer:
                 self.render()
             return
 
+        if input == 410:
+            return
+
         if input != self.text[self.index]:
             self.misses.append(self.index)
             self.miss_count += 1
+        else:
+            if self.index in self.misses:
+                self.misses.remove(self.index)
 
         self.index += 1
+        self.render()
+
+    def delete_word(self):
+        curr_index = self.index
+
+        # If we are at the beginning of a word, go back one index
+        if curr_index > 0 and self.text[curr_index-1] == " ":
+            curr_index -= 1
+
+        go_to = self.word_bounds(curr_index)[0]
+        
+        while True:
+            if self.index in self.misses:
+                self.misses.remove(self.index)
+
+            if self.index == go_to or self.index == 0:
+                break
+
+            self.index -= 1
+
         self.render()
 
     def __is_delimiter(self, value):

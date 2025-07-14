@@ -8,11 +8,16 @@ from typeclipy.buffer import Buffer
 
 # TODO:
 # - Improve app responsivity during runtime
+# - Save results on txt file
+# - Send results to stdout
+# - Send results to logging directory
+# - English dictionary
+# - Portuguese dictionary
 
 class App:
     def __init__(self, text, has_next, minimal, theme = None):
         self.text = text
-        self.debug = False
+        self.debug = True
         self.autoplay = False
         self.waiting = True
         self.done = False
@@ -22,7 +27,7 @@ class App:
         self.minimal = minimal
         self.theme = theme
 
-        self.menu_options = ["Retry", "Exit"]
+        self.menu_options = ["Exit", "Retry"]
         if self.has_next:
             self.menu_options.insert(0, "Next")
 
@@ -35,6 +40,7 @@ class App:
         stdscr.bkgd(" ", self.colors["background"])
         stdscr.clear()
         stdscr.refresh()
+        self.scr_height, self.scr_width = stdscr.getmaxyx()
 
         if curses.COLS > 200:
             self.x = round(curses.COLS * 0.25)
@@ -237,6 +243,12 @@ class App:
             elif key in (curses.KEY_ENTER, 10, 13):
                 return
 
+    def watch_for_resize(self, stdscr):
+        curr_height, curr_width = stdscr.getmaxyx()
+        if (curr_height, curr_width) != (self.scr_height, self.scr_width):
+            self.scr_heigth, self.scr_width = curr_height, curr_width
+            self.log(f"Screen was resized! New dimensions are: {curr_height}, {curr_width}")
+
     def run(self, stdscr):
         self.setup(stdscr)
 
@@ -260,8 +272,6 @@ class App:
             self.debug_window = curses.newwin(6, curses.COLS, curses.LINES - 5, 0)
             self.debug_window.refresh()
 
-        self.log(f"Starting application, has_next={self.has_next}")
-
         win = curses.newpad(self.buffer.line_count(), self.buffer_width)
         win.bkgd(" ", self.colors["background"])
         win.clear()
@@ -272,6 +282,7 @@ class App:
         outer.refresh()
 
         while True:
+            self.watch_for_resize(stdscr)
             self.print_rendered_text(win)
             self.render_status_bar(status_bar)
             win.move(0, 0)
@@ -280,12 +291,25 @@ class App:
 
             while self.buffer.index < len(self.text):
                 c = self.buffer.text[self.buffer.index]
+                seq = []
+
                 if self.autoplay:
                     time.sleep(0.1)
                 else:
                     c = win.get_wch()
+                    seq.append(c)
 
-                self.buffer.compute(c)
+                    if c == '\x1b':
+                        c2 = win.get_wch()
+
+                        if c2 != -1:
+                            seq.append(c2)
+
+                # Esc + Del?
+                if seq == ['\x1b', '\x7f']:
+                    self.buffer.delete_word()
+                else:
+                    self.buffer.compute(c)
 
                 if self.waiting:
                     self.start_time = time.perf_counter()
