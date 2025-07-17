@@ -13,12 +13,19 @@ class Buffer:
         self.rendered_text = ""
         self.highlighted = (0, 0)
         self.render()
+        self.update_height()
 
-        # Resize buffer if content is smaller than height:
+    def resize(self, width, height):
+        self.width = width
+        self.height = height
+        self.update_height()
+        self.render()
+
+    # Resize buffer if content is smaller than height:
+    def update_height(self):
         lc = self.line_count()
         if self.height > lc:
             self.height = max(lc, 8)
-
 
     def render(self):
         rendered_text = ""
@@ -103,9 +110,6 @@ class Buffer:
                 self.render()
             return
 
-        if input == 410:
-            return
-
         if input != self.text[self.index]:
             self.misses.append(self.index)
             self.miss_count += 1
@@ -124,7 +128,7 @@ class Buffer:
             curr_index -= 1
 
         go_to = self.word_bounds(curr_index)[0]
-        
+
         while True:
             if self.index in self.misses:
                 self.misses.remove(self.index)

@@ -1,6 +1,7 @@
 import argparse
 import sys
 import os
+import threading
 
 from typeclipy.app import App
 
@@ -27,9 +28,11 @@ def main():
             with open(file_path, "r", encoding="utf-8") as f:
                 text_list.append(f.read().strip())
 
+    screen_lock = threading.Lock()
+
     try:
         for idx, text in enumerate(text_list):
-            app = App(text, has_next=(idx < len(text_list) - 1), minimal=args.minimal, theme=args.theme)
+            app = App(text, has_next=(idx < len(text_list) - 1), minimal=args.minimal, theme=args.theme, screen_lock=screen_lock)
             stop = app.start()
 
             if stop:
