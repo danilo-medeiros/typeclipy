@@ -21,29 +21,94 @@ from typeclipy.buffer import Buffer
 # - Bug: The result screen is rendered with strange characters
 # - Reset menu option after retry
 
-class App:
-    def __init__(self, text, has_next, minimal, theme = None, screen_lock = threading.Lock()):
-        self.text = text
+class State:
+    def __init__(self, debug_view, has_next=False, minimal=False):
         self.debug = False
         self.autoplay = False
         self.waiting = True
         self.done = False
-        self.screen_lock = screen_lock
         self.result_menu_option = 0
         self.has_next = has_next
         self.minimal = minimal
-        self.theme = theme
-        self.buffer = None
-        self.outer = None
-        self.debug_window = None
-        self.win = None
-        self.status_bar = None
-        self.result_win = None
         self.end_time = None
+        self.debug_view = debug_view
 
         self.menu_options = ["Exit", "Retry"]
         if self.has_next:
             self.menu_options.insert(0, "Next")
+
+    def log(self, message):
+        self.debug_view.log(message)
+
+class View:
+    def __init__(self, colors):
+        self.window = None
+        self.colors = colors
+
+    def clear(self):
+        if self.window != None:
+            self.window.clear()
+
+    def render(self):
+        pass
+
+class ChildView(View):
+    def __init__(self, y, x, height, width, colors):
+        super().__init__(colors)
+        self.y = y
+        self.x = x
+        self.height = height
+        self.width = width
+
+    def clear(self):
+        if self.window != None:
+            self.window.clear()
+            del self.window
+
+    def render(self):
+        self.window = curses.newwin(self.height, self.width, self.y, self.x)
+        self.window.bkgd(" ", self.colors["background"])
+        self.window.clear()
+
+    def resize(self, y, x, height, width):
+        self.y = y
+        self.x = x
+        self.height = height
+        self.width = width
+
+class ScrollView(View):
+    def __init__(self, height, width, colors):
+        super().__init__(colors)
+
+    def render(self):
+        self.window = curses.newpad(height, width)
+        self.window.clear()
+
+class TextView(ScrollView):
+    def __init__(self, height, width, colors, buffer):
+        super().__init__(height, width, colors)
+        self.buffer = buffer
+
+class Container(ChildView):
+    def __init__(self, y, x, height, width, colors, text):
+        super().__init__(y, x, height, width, colors)
+        self.buffer = Buffer(text, width - 4, height - 4)
+        self.text_view = TextView(self.buffer.line_count(), self.buffer.width, colors, self.buffer)
+
+    def render(self):
+        super().render()
+        self.window.box()
+        self.text_view.render()
+        self.window.refresh()
+
+class DebugView(ChildView):
+    def __init__(self, y, x, height, width, colors):
+        super().__init__(y, x, height, width, colors)
+
+class Screen(View):
+    def __init__(self, theme, screen_lock):
+        self.theme = theme
+        self.screen_lock = screen_lock
 
     def setup(self, stdscr):
         self.stdscr = stdscr
@@ -52,10 +117,10 @@ class App:
         stdscr.keypad(True)
         curses.curs_set(0)
         self.define_colors()
+        self.set_dimensions()
         stdscr.bkgd(" ", self.colors["background"])
         stdscr.clear()
         stdscr.refresh()
-        self.set_dimensions()
         signal.signal(signal.SIGWINCH, self.on_resize)
 
     def set_dimensions(self):
@@ -126,6 +191,33 @@ class App:
             "reverse": curses.color_pair(3),
             "background": curses.color_pair(4)
         }
+
+    def on_resize(self, signum, frame):
+        pass
+
+class App(Screen):
+    def __init__(self, text, has_next, minimal, theme = None, screen_lock = threading.Lock()):
+        super().__init__(theme, screen_lock)
+
+        self.text = text
+        self.debug = False
+        self.autoplay = False
+        self.waiting = True
+        self.done = False
+        self.result_menu_option = 0
+        self.has_next = has_next
+        self.minimal = minimal
+        self.buffer = None
+        self.container = None
+        self.debug_window = None
+        self.text_view = None
+        self.status_bar = None
+        self.result_view = None
+        self.end_time = None
+
+        self.menu_options = ["Exit", "Retry"]
+        if self.has_next:
+            self.menu_options.insert(0, "Next")
 
     def teardown(self, stdscr):
         curses.nocbreak()
@@ -215,7 +307,7 @@ class App:
             self.status_bar.addstr(0, 35, f"Accuracy: {self.accuracy()}")
 
         self.status_bar.refresh()
-        self.outer.refresh()
+        self.container.refresh()
 
     def render_result(self):
         if self.end_time == None:
@@ -225,15 +317,15 @@ class App:
         duration_min = duration_s / 60
 
         wpm = self.wpm(self.end_time)
-        self.result_win.addstr(0, 0, f"WPM: {wpm:.0f}")
+        self.result_view.addstr(0, 0, f"WPM: {wpm:.0f}")
 
         if duration_s > 60:
             rest = (duration_min - int(duration_min)) * 60
-            self.result_win.addstr(1, 0, f"Time: {int(duration_min)}m {int(rest)}s")
+            self.result_view.addstr(1, 0, f"Time: {int(duration_min)}m {int(rest)}s")
         else:
-            self.result_win.addstr(1, 0, f"Time: {duration_s:.2f}s")
+            self.result_view.addstr(1, 0, f"Time: {duration_s:.2f}s")
 
-        self.result_win.addstr(2, 0, f"Accuracy: {self.accuracy()}")
+        self.result_view.addstr(2, 0, f"Accuracy: {self.accuracy()}")
 
 
     def log_memory_usage(self):
@@ -255,10 +347,10 @@ class App:
                 prefix = "›  " if idx == self.result_menu_option else "   "
                 text = f"{prefix}{option}".ljust(10)
                 color = self.colors["reverse"] if idx == self.result_menu_option else 0
-                self.result_win.addstr(5 + idx, 0, text, color)
+                self.result_view.addstr(5 + idx, 0, text, color)
 
-            self.result_win.refresh()
-            key = self.result_win.getch()
+            self.result_view.refresh()
+            key = self.result_view.getch()
 
             if key in (curses.KEY_DOWN, ord("j")) and self.result_menu_option < len(self.menu_options) - 1:
                 self.result_menu_option += 1
@@ -275,13 +367,13 @@ class App:
     def on_resize(self, signum, frame):
         with self.screen_lock:
             try:
-                self.win.clear()
+                self.text_view.clear()
                 self.status_bar.clear()
                 if self.debug:
                     self.debug_window.clear()
                 if self.done:
-                    self.result_win.clear()
-                self.outer.clear()
+                    self.result_view.clear()
+                self.container.clear()
                 self.stdscr.clear()
                 curses.endwin()
                 self.stdscr.refresh()
@@ -304,26 +396,26 @@ class App:
         self.y = self.y + diff // 2
         self.buffer_y += diff // 2
 
-        if self.outer != None:
-            del self.outer
+        if self.container != None:
+            del self.container
 
-        self.outer = curses.newwin(self.height, self.width, self.y, self.x)
+        self.container = curses.newwin(self.height, self.width, self.y, self.x)
 
-        self.outer.bkgd(" ", self.colors["background"])
-        self.outer.clear()
-        self.outer.box()
+        self.container.bkgd(" ", self.colors["background"])
+        self.container.clear()
+        self.container.box()
 
-        if self.win != None:
-            del self.win
+        if self.text_view != None:
+            del self.text_view
 
-        self.win = curses.newpad(self.buffer.line_count(), self.buffer_width)
-        self.win.bkgd(" ", self.colors["background"])
-        self.win.clear()
+        self.text_view = curses.newpad(self.buffer.line_count(), self.buffer_width)
+        self.text_view.bkgd(" ", self.colors["background"])
+        self.text_view.clear()
 
         if self.status_bar != None:
             del self.status_bar
 
-        self.status_bar = self.outer.derwin(1, self.buffer_width + 2, self.buffer_height + 2, 1)
+        self.status_bar = self.container.derwin(1, self.buffer_width + 2, self.buffer_height + 2, 1)
         # self.log(f"status_bar dimensions: {self.buffer_width + 2} {self.buffer_height + 2}\nScreen dimensions: {self.scr_width} {self.scr_height}\ncols and LINES: {curses.COLS} {curses.LINES}")
         self.status_bar.bkgd(" ", self.colors["reverse"])
 
@@ -334,14 +426,14 @@ class App:
             self.debug_window = curses.newwin(6, curses.COLS, curses.LINES - 5, 0)
             self.debug_window.refresh()
 
-        self.outer.refresh()
+        self.container.refresh()
 
         if self.done:
-            if self.result_win != None:
-                del self.result_win
+            if self.result_view != None:
+                del self.result_view
 
-            self.result_win = self.outer.derwin(self.buffer_height, self.buffer_width, 1, 2)
-            self.result_win.keypad(True)
+            self.result_view = self.container.derwin(self.buffer_height, self.buffer_width, 1, 2)
+            self.result_view.keypad(True)
 
             self.render_result()
 
@@ -350,6 +442,10 @@ class App:
 
         self.setup(stdscr)
         self.render()
+
+        debug_view = DebugView(6, curses.COLS, curses.LINES - 5, 0, self.colors)
+        state = State(debug_view, self.has_next, self.minimal)
+        container = Container(self.y, self.x, self.height, self.width, self.colors, self.text)
 
         def update_status_bar():
             while True:
@@ -363,12 +459,12 @@ class App:
 
         # Retry loop. The user continues here if he chooses 'Retry' at the end
         while True:
-            self.print_rendered_text(self.win)
+            self.print_rendered_text(self.text_view)
 
             t = threading.Thread(target=update_status_bar, daemon=True)
             t.start()
 
-            self.win.move(0, 0)
+            self.text_view.move(0, 0)
 
             self.start_time = 0
 
@@ -381,11 +477,11 @@ class App:
                     time.sleep(0.1)
                 else:
                     try:
-                        c = self.win.get_wch()
+                        c = self.text_view.get_wch()
                         seq.append(c)
 
                         if c == '\x1b':
-                            c2 = self.win.get_wch()
+                            c2 = self.text_view.get_wch()
 
                             if c2 != -1:
                                 seq.append(c2)
@@ -404,18 +500,18 @@ class App:
                         self.waiting = False
 
                 with self.screen_lock:
-                    self.print_rendered_text(self.win)
+                    self.print_rendered_text(self.text_view)
 
             self.done = True
 
-            self.win.clear()
-            self.win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
+            self.text_view.clear()
+            self.text_view.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
 
             if self.minimal:
                 break
 
-            self.result_win = self.outer.derwin(self.buffer_height, self.buffer_width, 1, 2)
-            self.result_win.keypad(True)
+            self.result_view = self.container.derwin(self.buffer_height, self.buffer_width, 1, 2)
+            self.result_view.keypad(True)
 
             self.render_result()
             self.render_result_menu()
@@ -427,10 +523,10 @@ class App:
                 self.waiting = True
                 self.done = False
 
-                del self.result_win
-                self.outer.clear()
-                self.outer.box()
-                self.outer.refresh()
+                del self.result_view
+                self.container.clear()
+                self.container.box()
+                self.container.refresh()
 
                 continue
             if selected_menu_option == "Exit":
