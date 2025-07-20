@@ -2,8 +2,21 @@ import argparse
 import sys
 import os
 import threading
+import random
 
 from typeclipy.app import App
+
+DEFAULT_WORD_LIST_LENGTH = 30
+
+def pick_words(words):
+    word_list = words.split("\n")
+    res = []
+
+    while len(res) <= DEFAULT_WORD_LIST_LENGTH:
+        idx = random.randint(0, len(word_list) - 1)
+        res.append(word_list[idx])
+
+    return " ".join(res)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -11,6 +24,7 @@ def main():
     parser.add_argument("--file", nargs="+", help="The path(s) of the .txt file(s) that contains the text that you want to type")
     parser.add_argument("--minimal", help="Don't show results", action="store_true")
     parser.add_argument("--theme", help="Application theme. Options: warm_sunset, ocean_breeze, solarized_dark")
+    parser.add_argument("--lang", help="Word list language. Options: en, pt")
 
     args = parser.parse_args()
 
@@ -27,6 +41,15 @@ def main():
         for file_path in args.file:
             with open(file_path, "r", encoding="utf-8") as f:
                 text_list.append(f.read().strip())
+    else:
+        text_list = []
+        file = "words_en.txt"
+
+        if args.lang in ["en", "pt"]:
+            file = f"words_{args.lang}.txt"
+
+        with open(f"assets/{file}", "r", encoding="utf-8") as f:
+            text_list.append(pick_words(f.read().strip()))
 
     screen_lock = threading.Lock()
 
