@@ -13,9 +13,6 @@ from typeclipy.buffer import Buffer
 # TODO:
 # - Send results to logging directory
 # - Syntax highlighting for code snippets
-# - Bug: First line is not rendered when the text is larger than the buffer height
-# - Bug: The result screen is rendered with strange characters
-# - Reset menu option after retry
 
 class App:
     def __init__(self, text, has_next, minimal, theme = None, screen_lock = threading.Lock()):
@@ -58,20 +55,21 @@ class App:
         self.scr_height, self.scr_width = self.stdscr.getmaxyx()
         curses.resizeterm(self.scr_height, self.scr_width)
 
-        if curses.COLS > 200:
-            self.x = round(curses.COLS * 0.25)
+        if curses.LINES < 20:
+            self.y = 0
+            self.height = curses.LINES
+        else:
             self.y = round(curses.LINES * 0.25)
             self.height = round(curses.LINES * 0.5)
+
+        if curses.COLS > 200:
+            self.x = round(curses.COLS * 0.25)
             self.width = round(curses.COLS * 0.5)
         elif curses.COLS > 100:
             self.x = round(curses.COLS * 0.15)
-            self.y = round(curses.LINES * 0.25)
-            self.height = round(curses.LINES * 0.5)
             self.width = round(curses.COLS * 0.70)
         else:
             self.x = 0
-            self.y = 0
-            self.height = curses.LINES
             self.width = curses.COLS
 
         self.buffer_x = self.x + 2
@@ -440,6 +438,7 @@ class App:
                 self.outer.clear()
                 self.outer.box()
                 self.outer.refresh()
+                self.result_menu_option = 0
 
                 continue
             if selected_menu_option == "Exit":
