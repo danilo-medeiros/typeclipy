@@ -23,8 +23,8 @@ def main():
     parser.add_argument("--text", nargs="+", help="The text you want to type")
     parser.add_argument("--file", nargs="+", help="The path(s) of the .txt file(s) that contains the text that you want to type")
     parser.add_argument("--minimal", help="Don't show results", action="store_true")
-    parser.add_argument("--theme", help="Application theme. Options: warm_sunset, ocean_breeze, solarized_dark")
-    parser.add_argument("--lang", help="Word list language. Options: en, pt")
+    parser.add_argument("--theme", help="Application theme", choices=["warm_sunset", "ocean_breeze", "solarized_dark"])
+    parser.add_argument("--lang", help="Word list language", choices=["pt", "en"], default="en")
 
     args = parser.parse_args()
 
@@ -43,9 +43,7 @@ def main():
                 text_list.append(f.read().strip())
     else:
         text_list = []
-        file = "words_en.txt"
-        if args.lang in ["en", "pt"]:
-            file = f"words_{args.lang}.txt"
+        file = f"words_{args.lang}.txt"
 
         base_dir = os.path.dirname(__file__)
         file_path = os.path.join(base_dir, "data", file)
