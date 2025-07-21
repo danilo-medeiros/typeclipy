@@ -44,11 +44,13 @@ def main():
     else:
         text_list = []
         file = "words_en.txt"
-
         if args.lang in ["en", "pt"]:
             file = f"words_{args.lang}.txt"
 
-        with open(f"assets/{file}", "r", encoding="utf-8") as f:
+        base_dir = os.path.dirname(__file__)
+        file_path = os.path.join(base_dir, "data", file)
+
+        with open(file_path, "r", encoding="utf-8") as f:
             text_list.append(pick_words(f.read().strip()))
 
     screen_lock = threading.Lock()

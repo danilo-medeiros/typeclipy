@@ -2,8 +2,12 @@ from setuptools import setup, find_packages
 
 setup(
     name='typeclipy',
-    version='0.2.0',
+    version='0.2.1',
     packages=find_packages(),
+    include_package_data=True,
+    package_data={
+        "typeclipy": ["data/*.txt"]
+    },
     install_requires=[
         "pytest",
     ],
