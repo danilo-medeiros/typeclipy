@@ -162,26 +162,28 @@ class App:
                 error = f"Error trying to print character '{text}', index #{text_index}. Text around: '{self.buffer.rendered_text[text_index - 10:text_index + 10]}'"
                 buffer_info = f"self.buffer_width: {self.buffer_width}, self.buffer_height: {self.buffer_height}"
                 outer_info = f"self.width: {self.width}, self.height: {self.height}"
-                self.log(f"{error}\nbuffer:\t{buffer_info}\nouter:\t{outer_info}")
+                # self.log(f"{error}\nbuffer:\t{buffer_info}\nouter:\t{outer_info}")
 
             text_index += 1
 
-        win.move(self.buffer.pos_y, self.buffer.pos_x)
+        (pos_y, pos_x) = self.buffer.position()
+        win.move(pos_y, pos_x)
 
         if len(self.buffer.rendered_text) > self.buffer.index:
             if self.buffer.text[self.buffer.index] == "\n":
-                win.addstr(self.buffer.pos_y, self.buffer.pos_x, "↵\n", self.colors["reverse"])
+                win.addstr(pos_y, pos_x, "↵\n", self.colors["reverse"])
             else:
-                win.addstr(self.buffer.pos_y, self.buffer.pos_x, self.buffer.rendered_text[self.buffer.index], self.colors["reverse"])
+                win.addstr(pos_y, pos_x, self.buffer.rendered_text[self.buffer.index], self.colors["reverse"])
 
         win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
 
     def log(self, message):
         if self.debug:
-            self.debug_window.move(0, 0)
-            self.debug_window.deleteln()
-            self.debug_window.addstr(0, 0, message)
-            self.debug_window.refresh()
+            with self.screen_lock:
+                self.debug_window.move(0, 0)
+                self.debug_window.deleteln()
+                self.debug_window.addstr(0, 0, message)
+                self.debug_window.refresh()
 
     def accuracy(self):
         if self.buffer.index > 0:
@@ -378,7 +380,7 @@ class App:
                 seq = []
 
                 if self.autoplay:
-                    time.sleep(0.1)
+                    time.sleep(0.02)
                 else:
                     try:
                         c = self.win.get_wch()

@@ -41,7 +41,7 @@ def main():
         for file_path in args.file:
             with open(file_path, "r", encoding="utf-8") as f:
                 text_list.append(f.read().strip())
-    else:
+    elif len(text_list) == 0:
         text_list = []
         file = f"words_{args.lang}.txt"
 

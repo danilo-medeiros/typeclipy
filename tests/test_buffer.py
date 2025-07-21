@@ -34,8 +34,8 @@ class TestBuffer:
 
     def test_render(self):
         buf = Buffer("Hello World", 80, 30, 5)
-        assert buf.pos_x == 5
-        assert buf.pos_y == 0
+        assert buf.position()[1] == 5
+        assert buf.position()[0] == 0
         assert buf.rendered_text == "Hello World"
         assert buf.highlighted == (-1, -1)
 
@@ -44,8 +44,8 @@ class TestBuffer:
         buf.compute("H")
         buf.compute("e")
         buf.compute("l")
-        assert buf.pos_x == 3
-        assert buf.pos_y == 0
+        assert buf.position()[1] == 3
+        assert buf.position()[0] == 0
 
     def test_position_after_backspace(self):
         buf = Buffer("Hello World", 80)
@@ -53,29 +53,29 @@ class TestBuffer:
         buf.compute("e")
         buf.compute("e")
         buf.compute('\x7f')
-        assert buf.pos_x == 2
-        assert buf.pos_y == 0
+        assert buf.position()[1] == 2
+        assert buf.position()[0] == 0
         assert buf.misses == []
         assert buf.miss_count == 1
 
     def test_position_with_line_breaks(self):
         buf = Buffer("Hello World\nWith line\nbreaks", 80, 30, 15)
         assert buf.rendered_text == "Hello World\nWith line\nbreaks"
-        assert buf.pos_y == 1
-        assert buf.pos_x == 3
+        assert buf.position()[0] == 1
+        assert buf.position()[1] == 3
         assert buf.highlighted == (12, 15)
 
     def test_position_with_line_wrap(self):
         buf = Buffer("Hello World, this example has a very long line", 20, 30, 21)
         assert buf.rendered_text == "Hello World, this\nexample has a very\nlong line"
-        assert buf.pos_y == 1
-        assert buf.pos_x == 3
+        assert buf.position()[0] == 1
+        assert buf.position()[1] == 3
         assert buf.highlighted == (18, 24)
 
     def test_render_with_line_wrap_on_space(self):
         buf = Buffer("Hello world", 6, 30, 6)
-        assert buf.pos_x == 0
-        assert buf.pos_y == 1
+        assert buf.position()[1] == 0
+        assert buf.position()[0] == 1
         assert buf.rendered_text == "Hello\nworld"
         assert buf.highlighted == (6, 10)
 
@@ -138,9 +138,9 @@ class TestBuffer:
 
         buf.delete_word()
         assert buf.miss_count == 1
-        assert buf.pos_x == 6
+        assert buf.position()[1] == 6
         assert buf.misses == []
 
         buf.delete_word()
-        assert buf.pos_x == 0
+        assert buf.position()[1] == 0
 

@@ -12,14 +12,15 @@ class Buffer:
         self.pos_y = 0
         self.rendered_text = ""
         self.highlighted = (0, 0)
+        self.positions = []
         self.render()
         self.update_height()
 
     def resize(self, width, height):
         self.width = width
         self.height = height
-        self.update_height()
         self.render()
+        self.update_height()
 
     # Resize buffer if content is smaller than height:
     def update_height(self):
@@ -27,18 +28,22 @@ class Buffer:
         if self.height > lc:
             self.height = max(lc, 8)
 
+    def position(self):
+        if self.index < len(self.text):
+            return self.positions[self.index]
+
+        return self.positions[-1]
+
     def render(self):
         rendered_text = ""
-
         col_index = 0
         line_index = 0
         text_index = 0
 
         while text_index < len(self.text):
-            # Set position variables if we are at the right place
-            if text_index == self.index:
-                self.pos_x = col_index
-                self.pos_y = line_index
+            # let's calculate the position of each character, as it will not change later
+            if len(self.rendered_text) == 0:
+                self.positions.append((line_index, col_index))
 
             # Find word
             word_bounds = self.word_bounds(text_index)
@@ -107,7 +112,6 @@ class Buffer:
                 self.index -= 1
                 if self.index in self.misses:
                     self.misses.remove(self.index)
-                self.render()
             return
 
         if input != self.text[self.index]:
@@ -118,7 +122,6 @@ class Buffer:
                 self.misses.remove(self.index)
 
         self.index += 1
-        self.render()
 
     def delete_word(self):
         curr_index = self.index
@@ -137,8 +140,6 @@ class Buffer:
                 break
 
             self.index -= 1
-
-        self.render()
 
     def __is_delimiter(self, value):
         return re.match(r"[\s\n]$", value) is not None
