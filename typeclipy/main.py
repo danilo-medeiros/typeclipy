@@ -22,9 +22,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--text", nargs="+", help="The text you want to type")
     parser.add_argument("--file", nargs="+", help="The path(s) of the .txt file(s) that contains the text that you want to type")
-    parser.add_argument("--minimal", help="Don't show results", action="store_true")
+    parser.add_argument("--minimal", help="Minimalist mode", action="store_true")
     parser.add_argument("--theme", help="Application theme", choices=["warm_sunset", "ocean_breeze", "solarized_dark"])
     parser.add_argument("--lang", help="Word list language", choices=["pt", "en"], default="en")
+    parser.add_argument("--out", default="-", help="File to save the results")
 
     args = parser.parse_args()
 
@@ -52,14 +53,22 @@ def main():
             text_list.append(pick_words(f.read().strip()))
 
     screen_lock = threading.Lock()
+    tests = []
 
     try:
         for idx, text in enumerate(text_list):
             app = App(text, has_next=(idx < len(text_list) - 1), minimal=args.minimal, theme=args.theme, screen_lock=screen_lock)
             stop = app.start()
+            tests.append(app)
 
             if stop:
                 break
     except KeyboardInterrupt:
         pass
+
+    if not args.minimal:
+        output_stream = open(args.out, "w") if args.out != "-" else sys.stdout
+
+        for idx, test in enumerate(tests):
+            print(f"{test.report()}", file=output_stream)
 

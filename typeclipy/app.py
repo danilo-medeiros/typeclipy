@@ -6,17 +6,13 @@ import signal
 import resource
 import sys
 
+from datetime import datetime
 from curses import wrapper
 from typeclipy.buffer import Buffer
 
 # TODO:
-# - Save results on txt file
-# - Send results to stdout
 # - Send results to logging directory
-# - English dictionary
-# - Portuguese dictionary
 # - Syntax highlighting for code snippets
-# - Lazy rendering
 # - Bug: First line is not rendered when the text is larger than the buffer height
 # - Bug: The result screen is rendered with strange characters
 # - Reset menu option after retry
@@ -219,24 +215,34 @@ class App:
         self.status_bar.refresh()
         self.outer.refresh()
 
-    def render_result(self):
-        if self.end_time == None:
-            self.end_time = time.perf_counter()
+    def result(self):
+        result = ""
 
         duration_s = self.end_time - self.start_time
         duration_min = duration_s / 60
 
         wpm = self.wpm(self.end_time)
-        self.result_win.addstr(0, 0, f"WPM: {wpm:.0f}")
+        result += f"WPM: {wpm:.0f}\n"
 
         if duration_s > 60:
             rest = (duration_min - int(duration_min)) * 60
-            self.result_win.addstr(1, 0, f"Time: {int(duration_min)}m {int(rest)}s")
+            result += f"Time: {int(duration_min)}m {int(rest)}s\n"
         else:
-            self.result_win.addstr(1, 0, f"Time: {duration_s:.2f}s")
+            result += f"Time: {duration_s:.2f}s\n"
 
-        self.result_win.addstr(2, 0, f"Accuracy: {self.accuracy()}")
+        result += f"Accuracy: {self.accuracy()}\n"
 
+        return result
+
+    def render_result(self):
+        if self.end_time == None:
+            self.end_time = time.perf_counter()
+
+        self.result_win.addstr(0, 0, self.result())
+
+    def report(self):
+        date = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
+        return f"{date}\n{self.result()}"
 
     def log_memory_usage(self):
         usage = resource.getrusage(resource.RUSAGE_SELF)
@@ -367,8 +373,9 @@ class App:
         while True:
             self.print_rendered_text(self.win)
 
-            t = threading.Thread(target=update_status_bar, daemon=True)
-            t.start()
+            if not self.minimal:
+                t = threading.Thread(target=update_status_bar, daemon=True)
+                t.start()
 
             self.win.move(0, 0)
 
