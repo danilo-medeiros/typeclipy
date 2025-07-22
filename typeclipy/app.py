@@ -11,15 +11,13 @@ from curses import wrapper
 from typeclipy.buffer import Buffer
 
 # TODO:
-# - Bug!: wpm is not calculated correctly for leading spaces
 # - Send results to logging directory
-# - Syntax highlighting for code snippets
 
 class App:
-    def __init__(self, text, has_next, minimal, theme = None, screen_lock = threading.Lock(), color_list = [], leading_spaces = False):
+    def __init__(self, text, has_next, minimal, theme = None, screen_lock = threading.Lock(), color_list = [], leading_spaces = False, debug = False, autoplay = False):
         self.text = text
-        self.debug = False
-        self.autoplay = False
+        self.debug = debug
+        self.autoplay = autoplay
         self.waiting = True
         self.done = False
         self.screen_lock = screen_lock
@@ -177,7 +175,7 @@ class App:
                 error = f"Error trying to print character '{text}', index #{text_index}. Text around: '{self.buffer.rendered_text[text_index - 10:text_index + 10]}'"
                 buffer_info = f"self.buffer_width: {self.buffer_width}, self.buffer_height: {self.buffer_height}"
                 outer_info = f"self.width: {self.width}, self.height: {self.height}"
-                # self.log(f"{error}\nbuffer:\t{buffer_info}\nouter:\t{outer_info}")
+                self.log(f"{error}\nbuffer:\t{buffer_info}\nouter:\t{outer_info}")
 
             text_index += 1
 
@@ -208,7 +206,7 @@ class App:
     def wpm(self, now):
         duration_s = now - self.start_time
         duration_min = duration_s / 60
-        return int((self.buffer.index + 1) / 5 / duration_min)
+        return int(self.buffer.typed / 5 / duration_min)
 
     def render_status_bar(self):
         self.status_bar.erase()
@@ -227,9 +225,12 @@ class App:
             if wpm < 300:
                 wpm_s = f"{wpm}"
 
-            self.status_bar.addstr(0, 0, f"  WPM: {wpm_s}")
-            self.status_bar.addstr(0, 17, f"Time: {int(now - self.start_time)}s")
-            self.status_bar.addstr(0, 35, f"Accuracy: {self.accuracy()}")
+            self.status_bar.addstr(0, 1, f"WPM: {wpm_s}")
+            self.status_bar.addstr(0, int(self.buffer_width * 0.25), f"Time: {int(now - self.start_time)}s")
+            self.status_bar.addstr(0, int(self.buffer_width * 0.45), f"Accuracy: {self.accuracy()}")
+
+            if self.autoplay:
+                self.status_bar.addstr(0, int(self.buffer_width * 0.8), f"Autoplay: ON")
 
         self.status_bar.refresh()
         self.outer.refresh()
@@ -322,7 +323,7 @@ class App:
         if self.buffer != None:
             self.buffer.resize(self.buffer_width, self.buffer_height)
         else:
-            self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height, 0, self.leading_spaces)
+            self.create_buffer()
 
         # Resize default dimensions if buffer height is smaller than expected
         diff = self.buffer_height - self.buffer.height
@@ -371,11 +372,15 @@ class App:
 
             self.render_result()
 
+    def create_buffer(self):
+        self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height, 0, self.leading_spaces)
+
     def run(self, stdscr):
         stop = False
 
         self.setup(stdscr)
         self.render()
+        self.log("Initialized application")
 
         def update_status_bar():
             while True:
@@ -405,7 +410,7 @@ class App:
                 seq = []
 
                 if self.autoplay:
-                    time.sleep(0.02)
+                    time.sleep(0.1)
                 else:
                     try:
                         c = self.win.get_wch()
@@ -450,7 +455,7 @@ class App:
             selected_menu_option = self.menu_options[self.result_menu_option]
 
             if selected_menu_option == "Retry":
-                self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height)
+                self.create_buffer()
                 self.waiting = True
                 self.done = False
 

@@ -28,6 +28,10 @@ def main():
     parser.add_argument("--lang", help="Word list language", choices=["pt", "en"], default="en")
     parser.add_argument("--out", default="-", help="File to save the results")
 
+    # Development flags
+    parser.add_argument("--debug", help="Debug mode", action="store_true")
+    parser.add_argument("--autoplay", help="Type text automatically", action="store_true")
+
     args = parser.parse_args()
 
     text_list = args.text or []
@@ -72,7 +76,9 @@ def main():
                 theme=args.theme,
                 screen_lock=screen_lock,
                 color_list=color_list(file_type_list[idx], text),
-                leading_spaces=file_type_list[idx] != "txt"
+                leading_spaces=file_type_list[idx] != "txt",
+                debug=args.debug,
+                autoplay=args.autoplay
             )
             stop = app.start()
             tests.append(app)

@@ -14,6 +14,7 @@ class Buffer:
         self.highlighted = (0, 0)
         self.positions = []
         self.leading_spaces = leading_spaces
+        self.typed = 0
         self.render()
         self.update_height()
 
@@ -130,6 +131,7 @@ class Buffer:
                 self.misses.remove(self.index)
 
         self.index += 1
+        self.typed += 1
 
         if self.leading_spaces and input == "\n":
             while self.text[self.index] == " ":
