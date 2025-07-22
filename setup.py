@@ -10,6 +10,7 @@ setup(
     },
     install_requires=[
         "pytest",
+        "Pygments"
     ],
     entry_points={
         "console_scripts": [

@@ -1,7 +1,7 @@
 import re
 
 class Buffer:
-    def __init__(self, text, width, height = 30, index = 0):
+    def __init__(self, text, width, height = 30, index = 0, leading_spaces = False):
         self.text = text
         self.width = width
         self.height = height
@@ -13,6 +13,7 @@ class Buffer:
         self.rendered_text = ""
         self.highlighted = (0, 0)
         self.positions = []
+        self.leading_spaces = leading_spaces
         self.render()
         self.update_height()
 
@@ -27,6 +28,15 @@ class Buffer:
         lc = self.line_count()
         if self.height > lc:
             self.height = max(lc, 8)
+
+    def highlight(self):
+        if self.index < len(self.text):
+            word_bounds = self.word_bounds(self.index)
+
+            if self.__is_delimiter(self.text[self.index]):
+                self.highlighted = (-1, -1)
+            else:
+                self.highlighted = word_bounds
 
     def position(self):
         if self.index < len(self.text):
@@ -51,10 +61,7 @@ class Buffer:
             line_end = col_index + remaining_word_length
 
             if text_index == self.index:
-                if self.__is_delimiter(self.text[text_index]):
-                    self.highlighted = (-1, -1)
-                else:
-                    self.highlighted = word_bounds
+                self.highlight()
 
             if line_end >= self.width - 1 or self.text[text_index] == "\n":
                 col_index = 0
@@ -112,6 +119,7 @@ class Buffer:
                 self.index -= 1
                 if self.index in self.misses:
                     self.misses.remove(self.index)
+                    self.highlight()
             return
 
         if input != self.text[self.index]:
@@ -122,6 +130,12 @@ class Buffer:
                 self.misses.remove(self.index)
 
         self.index += 1
+
+        if self.leading_spaces and input == "\n":
+            while self.text[self.index] == " ":
+                self.index += 1
+
+        self.highlight()
 
     def delete_word(self):
         curr_index = self.index
@@ -140,6 +154,8 @@ class Buffer:
                 break
 
             self.index -= 1
+
+        self.highlight()
 
     def __is_delimiter(self, value):
         return re.match(r"[\s\n]$", value) is not None

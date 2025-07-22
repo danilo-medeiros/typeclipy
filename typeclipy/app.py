@@ -11,11 +11,12 @@ from curses import wrapper
 from typeclipy.buffer import Buffer
 
 # TODO:
+# - Bug!: wpm is not calculated correctly for leading spaces
 # - Send results to logging directory
 # - Syntax highlighting for code snippets
 
 class App:
-    def __init__(self, text, has_next, minimal, theme = None, screen_lock = threading.Lock()):
+    def __init__(self, text, has_next, minimal, theme = None, screen_lock = threading.Lock(), color_list = [], leading_spaces = False):
         self.text = text
         self.debug = False
         self.autoplay = False
@@ -26,6 +27,7 @@ class App:
         self.has_next = has_next
         self.minimal = minimal
         self.theme = theme
+        self.color_list = color_list
         self.buffer = None
         self.outer = None
         self.debug_window = None
@@ -33,6 +35,7 @@ class App:
         self.status_bar = None
         self.result_win = None
         self.end_time = None
+        self.leading_spaces = leading_spaces
 
         self.menu_options = ["Exit", "Retry"]
         if self.has_next:
@@ -121,6 +124,16 @@ class App:
             "background": curses.color_pair(4)
         }
 
+        # Syntax highlighting
+        curses.init_pair(5, 12, background)
+        curses.init_pair(6, 10, background)
+        curses.init_pair(7, 13, background)
+        curses.init_pair(8, 14, background)
+        curses.init_pair(9, 9, background)
+        curses.init_pair(10, 3, background)
+        curses.init_pair(11, 5, background)
+        curses.init_pair(12, 51, background)
+
     def teardown(self, stdscr):
         curses.nocbreak()
         stdscr.keypad(False)
@@ -128,6 +141,7 @@ class App:
 
     def print_rendered_text(self, win):
         text_index = 0
+        has_custom_color = len(self.color_list) > 0
 
         win.move(0, 0)
 
@@ -149,7 +163,14 @@ class App:
                 elif hit:
                     win.addstr(text, self.colors["success"])
                 elif underlined:
-                    win.addstr(text, curses.A_UNDERLINE)
+                    style = curses.A_UNDERLINE
+
+                    if has_custom_color:
+                        style = curses.A_UNDERLINE | curses.color_pair(self.color_list[text_index])
+
+                    win.addstr(text, style)
+                elif has_custom_color:
+                    win.addstr(text, curses.color_pair(self.color_list[text_index]))
                 else:
                     win.addstr(text)
             except Exception as e:
@@ -301,7 +322,7 @@ class App:
         if self.buffer != None:
             self.buffer.resize(self.buffer_width, self.buffer_height)
         else:
-            self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height)
+            self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height, 0, self.leading_spaces)
 
         # Resize default dimensions if buffer height is smaller than expected
         diff = self.buffer_height - self.buffer.height
@@ -330,7 +351,6 @@ class App:
             del self.status_bar
 
         self.status_bar = self.outer.derwin(1, self.buffer_width + 2, self.buffer_height + 2, 1)
-        # self.log(f"status_bar dimensions: {self.buffer_width + 2} {self.buffer_height + 2}\nScreen dimensions: {self.scr_width} {self.scr_height}\ncols and LINES: {curses.COLS} {curses.LINES}")
         self.status_bar.bkgd(" ", self.colors["reverse"])
 
         if self.debug:

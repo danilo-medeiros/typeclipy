@@ -5,6 +5,7 @@ import threading
 import random
 
 from typeclipy.app import App
+from typeclipy.syntax_highlighting import color_list
 
 DEFAULT_WORD_LIST_LENGTH = 30
 
@@ -30,10 +31,15 @@ def main():
     args = parser.parse_args()
 
     text_list = args.text or []
+    file_type_list = []
+
+    for t in text_list:
+        file_type_list.append("txt")
 
     if not sys.stdin.isatty():
         data = sys.stdin.read()
         text_list = [data.strip()]
+        file_type_list = ["txt"]
         tty = open("/dev/tty")
         os.dup2(tty.fileno(), sys.stdin.fileno())
     elif args.file:
@@ -42,6 +48,7 @@ def main():
         for file_path in args.file:
             with open(file_path, "r", encoding="utf-8") as f:
                 text_list.append(f.read().strip())
+                file_type_list.append(file_path.split(".")[-1])
     elif len(text_list) == 0:
         text_list = []
         file = f"words_{args.lang}.txt"
@@ -51,13 +58,22 @@ def main():
 
         with open(file_path, "r", encoding="utf-8") as f:
             text_list.append(pick_words(f.read().strip()))
+            file_type_list.append("txt")
 
     screen_lock = threading.Lock()
     tests = []
 
     try:
         for idx, text in enumerate(text_list):
-            app = App(text, has_next=(idx < len(text_list) - 1), minimal=args.minimal, theme=args.theme, screen_lock=screen_lock)
+            app = App(
+                text,
+                has_next=(idx < len(text_list) - 1),
+                minimal=args.minimal,
+                theme=args.theme,
+                screen_lock=screen_lock,
+                color_list=color_list(file_type_list[idx], text),
+                leading_spaces=file_type_list[idx] != "txt"
+            )
             stop = app.start()
             tests.append(app)
 
