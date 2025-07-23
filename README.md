@@ -22,7 +22,10 @@ pip install -e .
 ## Usage
 
 ```bash
-# Type multiple texts
+# Type random words
+typeclipy
+
+# Type custom text
 typeclipy --text "Hello World" "Bye World"
 
 # Type text from a file
@@ -30,9 +33,15 @@ typeclipy --file my_word_list.txt another_word_list.txt
 
 # Pipe text from another command
 echo "Hello World" | typeclipy
+
+# Custom theme
+typeclipy --theme light_beige
 ```
 
 ### Options:
-- `--text <text>`: List of texts to type
-- `--file <file>`: List of files to type
+- `--text <text> [...]`: List of texts to type
+- `--file <file> [...]`: List of files to type
 - `--minimal`: Hide final results and menu
+- `--theme <theme>` Application theme. See `typeclipy --help` for options
+- `--lang <lang>` Language of the random word list. English by default
+- `--out <file path>` File to save the results

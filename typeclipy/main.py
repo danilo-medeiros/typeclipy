@@ -8,6 +8,7 @@ from typeclipy.app import App
 from typeclipy.syntax_highlighting import color_list
 
 DEFAULT_WORD_LIST_LENGTH = 30
+DEFAULT_TEST_COUNT = 20
 
 def pick_words(words):
     word_list = words.split("\n")
@@ -24,13 +25,13 @@ def main():
     parser.add_argument("--text", nargs="+", help="The text you want to type")
     parser.add_argument("--file", nargs="+", help="The path(s) of the .txt file(s) that contains the text that you want to type")
     parser.add_argument("--minimal", help="Minimalist mode", action="store_true")
-    parser.add_argument("--theme", help="Application theme", choices=["warm_sunset", "ocean_breeze", "solarized_dark"])
+    parser.add_argument("--theme", help="Application theme", choices=["warm_sunset", "ocean_breeze", "solarized_dark", "light_beige"])
     parser.add_argument("--lang", help="Word list language", choices=["pt", "en"], default="en")
     parser.add_argument("--out", default="-", help="File to save the results")
 
     # Development flags
-    parser.add_argument("--debug", help="Debug mode", action="store_true")
-    parser.add_argument("--autoplay", help="Type text automatically", action="store_true")
+    parser.add_argument("--debug", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--autoplay", action="store_true", help=argparse.SUPPRESS)
 
     args = parser.parse_args()
 
@@ -61,8 +62,10 @@ def main():
         file_path = os.path.join(base_dir, "data", file)
 
         with open(file_path, "r", encoding="utf-8") as f:
-            text_list.append(pick_words(f.read().strip()))
-            file_type_list.append("txt")
+            content = f.read().strip()
+            for _ in range(DEFAULT_TEST_COUNT):
+                text_list.append(pick_words(content))
+                file_type_list.append("txt")
 
     screen_lock = threading.Lock()
     tests = []

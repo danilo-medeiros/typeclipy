@@ -109,6 +109,11 @@ class App:
             success = 108
             primary = 136
             danger = 167
+        elif self.theme == "light_beige":
+            background = 230
+            success = 28
+            primary = 58
+            danger = 160
 
         curses.init_pair(1, success, background)
         curses.init_pair(2, primary, danger)
