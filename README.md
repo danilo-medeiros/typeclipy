@@ -1,10 +1,10 @@
 # typeclipy
-## A lightweight command-line tool to help you practice typing with custom exercises
+## A lightweight command-line tool to practice typing with custom exercises
 
 ![Screenshot](assets/screenshot.jpg)
 
 ## Features
-- Practice typing the text you want
+- Practice typing with random words or custom text
 - Tracks typing speed and accuracy
 - Fully offline, no internet needed
 
@@ -34,7 +34,7 @@ typeclipy --file my_word_list.txt another_word_list.txt
 # Pipe text from another command
 echo "Hello World" | typeclipy
 
-# Custom theme
+# Choose theme
 typeclipy --theme light_beige
 ```
 
@@ -43,5 +43,5 @@ typeclipy --theme light_beige
 - `--file <file> [...]`: List of files to type
 - `--minimal`: Hide final results and menu
 - `--theme <theme>` Application theme. See `typeclipy --help` for options
-- `--lang <lang>` Language of the random word list. English by default
+- `--lang <en|pt>` Language of the random word list. English by default
 - `--out <file path>` File to save the results

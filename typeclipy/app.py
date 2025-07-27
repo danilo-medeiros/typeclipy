@@ -33,6 +33,7 @@ class App:
         self.status_bar = None
         self.result_win = None
         self.end_time = None
+        self.finished_at = None
         self.leading_spaces = leading_spaces
 
         self.menu_options = ["Exit", "Retry"]
@@ -260,13 +261,10 @@ class App:
         return result
 
     def render_result(self):
-        if self.end_time == None:
-            self.end_time = time.perf_counter()
-
         self.result_win.addstr(0, 0, self.result())
 
     def report(self):
-        date = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
+        date = self.finished_at.strftime("%Y-%m-%d %H:%M:%S %z")
         return f"{date}\n{self.result()}"
 
     def log_memory_usage(self):
@@ -380,6 +378,15 @@ class App:
     def create_buffer(self):
         self.buffer = Buffer(self.text, self.buffer_width, self.buffer_height, 0, self.leading_spaces)
 
+    def start_timer(self):
+        self.start_time = time.perf_counter()
+        self.end_time = None
+        self.finished_at = None
+
+    def stop_timer(self):
+        self.end_time = time.perf_counter()
+        self.finished_at = datetime.now().astimezone()
+
     def run(self, stdscr):
         stop = False
 
@@ -406,8 +413,6 @@ class App:
                 t.start()
 
             self.win.move(0, 0)
-
-            self.start_time = 0
 
             # Main loop. Iterates through all characters of the text
             while self.buffer.index < len(self.text):
@@ -436,14 +441,14 @@ class App:
                     self.buffer.compute(c)
 
                     if self.waiting:
-                        self.start_time = time.perf_counter()
-                        self.end_time = None
+                        self.start_timer()
                         self.waiting = False
 
                 with self.screen_lock:
                     self.print_rendered_text(self.win)
 
             self.done = True
+            self.stop_timer()
 
             self.win.clear()
             self.win.refresh(self.buffer.scroll_pos(), 0, self.buffer_y, self.buffer_x, self.buffer_height + self.y, self.buffer_width + self.x)
