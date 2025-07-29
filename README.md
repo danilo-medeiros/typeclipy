@@ -10,7 +10,11 @@
 
 ## Installation
 ```
-pip install git+https://github.com/danilo-medeiros/typeclipy.git
+# create a virtual environment
+python3 -m venv venv
+source venv/bin/activate
+# install the app
+pip3 install git+https://github.com/danilo-medeiros/typeclipy.git
 ```
 Or clone and install editable version for development:
 ```
