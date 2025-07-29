@@ -7,12 +7,16 @@
 - Practice typing with random words or custom text
 - Tracks typing speed and accuracy
 - Fully offline, no internet needed
+- Syntax highlighting for code
 
 ## Installation
 ```
 # create a virtual environment
 python3 -m venv venv
+
+# activate the environment
 source venv/bin/activate
+
 # install the app
 pip3 install git+https://github.com/danilo-medeiros/typeclipy.git
 ```
